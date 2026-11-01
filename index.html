@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Movie Desk 0.4.7</title>
+<title>Movie Desk 0.4.4</title>
 <style>
 body{margin:0;background:#111;color:#eee;font-family:system-ui,sans-serif;padding:12px}
 h1{margin:0 0 4px;font-size:1.6rem}
@@ -24,14 +24,10 @@ input{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center}
 .modal.show{display:flex}
 .modal-box{background:#222;padding:20px;border-radius:12px;max-width:320px}
-#scanOverlay{position:fixed;inset:0;background:#000;z-index:9999;display:none;flex-direction:column;align-items:center;justify-content:center}
-#scanOverlay.show{display:flex}
-#scanOverlay video{width:100%;height:70%;object-fit:cover}
-#scanCancel{position:absolute;bottom:40px;background:#c44;color:#fff;border:none;padding:12px 24px;border-radius:8px;font-size:1.1rem}
 </style>
 </head>
 <body>
-<h1>Movie Desk 0.4.7</h1>
+<h1>Movie Desk 0.4.4</h1>
 <div class="sub" id="counts">Ready</div>
 <button id="settingsBtn" style="float:right;height:32px;margin-top:-28px;">Settings</button>
 
@@ -59,11 +55,6 @@ input{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding
 <input id="q" placeholder="Search your titles..." style="margin:12px 0">
 <div id="out"></div>
 
-<div id="scanOverlay">
-  <video id="scanVideo" playsinline></video>
-  <button id="scanCancel">Cancel</button>
-</div>
-
 <div class="modal" id="settingsModal">
   <div class="modal-box" style="max-width:360px;">
     <p>Friends ratings</p>
@@ -83,8 +74,6 @@ let friends = JSON.parse(localStorage.getItem("md_friends") || "[]");
 let friendVisible = JSON.parse(localStorage.getItem("md_friend_vis") || "{}");
 let homoFlags = JSON.parse(localStorage.getItem("md_homo") || "{}");
 let ratingCache = JSON.parse(localStorage.getItem("md_rating_cache") || "{}");
-let scanStream = null;
-let scanTimer = null;
 
 function $(id){return document.getElementById(id)}
 function norm(s){return (s||"").toLowerCase().trim()}
@@ -174,54 +163,6 @@ async function render(){
     };
   });
 }
-
-function stopScan(){
-  if(scanTimer){ clearTimeout(scanTimer); scanTimer = null; }
-  if(scanStream){ scanStream.getTracks().forEach(t => t.stop()); scanStream = null; }
-  $("scanOverlay").classList.remove("show");
-}
-
-async function startScan(){
-  if(!("BarcodeDetector" in window)){
-    alert("BarcodeDetector not supported. Type the barcode and hit Add.");
-    return;
-  }
-  try{
-    scanStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-    const video = $("scanVideo");
-    video.srcObject = scanStream;
-    $("scanOverlay").classList.add("show");
-    await video.play();
-
-    const detector = new BarcodeDetector({ formats: ["ean_13", "upc_a", "upc_e", "code_128"] });
-
-    const tick = async () => {
-      if(!$("scanOverlay").classList.contains("show")) return;
-      try{
-        const codes = await detector.detect(video);
-        if(codes.length){
-          const code = codes[0].rawValue;
-          stopScan();
-          $("newTitle").value = code;
-          // store barcode; try title lookup only if it looks like a name
-          manualTitles.unshift({ title: code, barcode: code });
-          saveManual();
-          $("newTitle").value = "";
-          render();
-          return;
-        }
-      }catch(e){}
-      scanTimer = setTimeout(tick, 300);
-    };
-    tick();
-  }catch(err){
-    alert("Camera failed: " + err.message);
-    stopScan();
-  }
-}
-
-$("scanBtn").onclick = startScan;
-$("scanCancel").onclick = stopScan;
 
 function renderFriends(){
   const box = $("friendsList");
