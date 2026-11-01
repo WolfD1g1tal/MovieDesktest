@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Movie Desk 0.4.4</title>
+<title>Movie Desk 0.4.5</title>
 <style>
 body{margin:0;background:#111;color:#eee;font-family:system-ui,sans-serif;padding:12px}
 h1{margin:0 0 4px;font-size:1.6rem}
@@ -14,6 +14,7 @@ input{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding
 .row{display:flex;gap:8px;margin:8px 0}
 .card{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:12px;margin:8px 0}
 .title{font-weight:600;margin-bottom:6px}
+.meta{color:#888;font-size:0.85rem;margin:4px 0}
 .flags{display:flex;flex-wrap:wrap;gap:6px}
 .flag{padding:4px 10px;border-radius:20px;font-size:0.85rem;cursor:pointer}
 .own{background:#1e3a2f;color:#8fd}
@@ -21,42 +22,48 @@ input{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding
 .gay-no{background:#1e2a3a;color:#8af}
 .imdb{background:#2a2a1a;color:#e0c07a}
 .you{background:#0a2a2a;color:#00e5ff}
+.pkg{background:#2a1a2a;color:#e0a0e0}
+.child-list{margin-top:8px;border-top:1px solid #333;padding-top:8px}
+.child-item{background:#222;border:1px solid #444;border-radius:6px;padding:8px;margin:4px 0;cursor:pointer}
+.child-item:hover{background:#2a2a2a}
+.detail{background:#1a1a1a;border:1px solid #555;border-radius:10px;padding:16px;margin:12px 0}
 .modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center}
 .modal.show{display:flex}
-.modal-box{background:#222;padding:20px;border-radius:12px;max-width:320px}
+.modal-box{background:#222;padding:20px;border-radius:12px;max-width:360px}
 </style>
 </head>
 <body>
-<h1>Movie Desk 0.4.4</h1>
+<h1>Movie Desk 0.4.5</h1>
 <div class="sub" id="counts">Ready</div>
 <button id="settingsBtn" style="float:right;height:32px;margin-top:-28px;">Settings</button>
 
 <div class="row">
   <button id="loadColl">Load Collection CSV</button>
   <button id="loadRate">Load Ratings CSV</button>
+  <button id="demoBtn">Add Demo Pack</button>
 </div>
 <input type="file" id="collFile" accept=".csv" hidden>
 <input type="file" id="rateFile" accept=".csv" hidden>
 
-<div style="margin:16px 0 4px">Add Title</div>
+<div style="margin:16px 0 4px">Add Title (creates a mother)</div>
 <div class="row">
   <input id="newTitle" placeholder="Add title or barcode...">
   <button id="addBtn">Add</button>
-  <button id="scanBtn">Scan</button>
 </div>
 
-<div style="margin:16px 0 4px">Buy Lookup</div>
+<div style="margin:16px 0 4px">Add Child to Mother</div>
 <div class="row">
-  <input id="buyQ" placeholder="Search to buy...">
-  <button id="buyBtn">Search</button>
+  <input id="childTitle" placeholder="Child title...">
+  <input id="motherIdInput" placeholder="Mother ID..." style="max-width:140px">
+  <button id="addChildBtn">Add Child</button>
 </div>
-<div id="buyBox" style="background:#1a1a1a;border:1px solid #333;border-radius:8px;padding:10px;margin:8px 0;min-height:40px;color:#aaa"></div>
 
 <input id="q" placeholder="Search your titles..." style="margin:12px 0">
 <div id="out"></div>
+<div id="detail"></div>
 
 <div class="modal" id="settingsModal">
-  <div class="modal-box" style="max-width:360px;">
+  <div class="modal-box">
     <p>Friends ratings</p>
     <div id="friendsList"></div>
     <input type="text" id="newFriend" placeholder="Friend name" style="margin:8px 0;">
@@ -84,6 +91,25 @@ function saveFriends(){localStorage.setItem("md_friends", JSON.stringify(friends
 function saveHomo(){localStorage.setItem("md_homo", JSON.stringify(homoFlags))}
 function saveCache(){localStorage.setItem("md_rating_cache", JSON.stringify(ratingCache))}
 
+function makeId(){return "id-"+Math.random().toString(36).slice(2,10)}
+
+function makeMother(title, extra={}){
+  return {
+    id: makeId(),
+    title,
+    barcode: extra.barcode || "",
+    isMother: true,
+    diskCount: extra.diskCount || 1,
+    children: extra.children || [],
+    motherId: extra.motherId || null,
+    fromPackage: extra.fromPackage || null,
+    imdbId: extra.imdbId || "",
+    publicRating: extra.publicRating || "",
+    edition: extra.edition || "",
+    notes: extra.notes || ""
+  };
+}
+
 function cleanTitle(t){
   return (t||"")
     .replace(/\(.*?\)/g, "")
@@ -96,6 +122,10 @@ function cleanTitle(t){
 
 function getAllTitles(){
   return [...collection, ...manualTitles];
+}
+
+function getById(id){
+  return getAllTitles().find(x => x.id === id);
 }
 
 async function enrichTitle(m){
@@ -120,27 +150,48 @@ async function enrichTitle(m){
   return m;
 }
 
+function renderCard(m, isChildView=false){
+  const key = m.id || m.title;
+  const isYes = !!homoFlags[key];
+  const you = ratingsById[m.imdbId] || m.manualYou || "—";
+  const pub = m.publicRating || m.manualPublic || "—";
+  const pkgNote = m.fromPackage ? `<span class="flag pkg">From: ${m.fromPackage}</span>` : "";
+  const childHtml = (m.children && m.children.length)
+    ? `<div class="child-list">
+         <div class="meta">Children in this package:</div>
+         ${m.children.map(cid => {
+           const c = getById(cid);
+           return c ? `<div class="child-item" data-open="${c.id}">${c.title}</div>` : "";
+         }).join("")}
+       </div>`
+    : "";
+  return `<div class="card" data-id="${m.id}">
+    <div class="title">${m.title}</div>
+    <div class="meta">Disks: ${m.diskCount || 1} &nbsp;|&nbsp; ID: ${m.id}</div>
+    <div class="flags">
+      <span class="flag own">Owned</span>
+      ${pkgNote}
+      <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
+      <span class="flag imdb" data-type="public" data-key="${key}">IMDb: ${pub}</span>
+      <span class="flag you" data-type="you" data-key="${key}">You: ${you}</span>
+    </div>
+    ${childHtml}
+  </div>`;
+}
+
 async function render(){
   const q = norm($("q").value);
   let all = getAllTitles().filter(m => !q || norm(m.title).includes(q));
   const toEnrich = all.slice(0, 20);
   for(let m of toEnrich) await enrichTitle(m);
   $("counts").textContent = `${all.length} shown / ${getAllTitles().length} total`;
-  $("out").innerHTML = all.slice(0,80).map(m => {
-    const key = m.title;
-    const isYes = !!homoFlags[key];
-    const you = ratingsById[m.imdbId] || m.manualYou || "—";
-    const pub = m.publicRating || m.manualPublic || "—";
-    return `<div class="card">
-      <div class="title">${m.title}</div>
-      <div class="flags">
-        <span class="flag own">Owned</span>
-        <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
-        <span class="flag imdb" data-type="public" data-key="${key}">IMDb: ${pub}</span>
-        <span class="flag you" data-type="you" data-key="${key}">You: ${you}</span>
-      </div>
-    </div>`;
-  }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
+  $("out").innerHTML = all.slice(0,80).map(m => renderCard(m)).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
+  $("detail").innerHTML = "";
+  bindFlags();
+  bindOpen();
+}
+
+function bindFlags(){
   document.querySelectorAll(".flag[data-key]").forEach(el => {
     el.onclick = () => {
       const key = el.dataset.key;
@@ -148,7 +199,7 @@ async function render(){
       if(type === "public" || type === "you"){
         const val = prompt(type === "public" ? "Enter IMDb rating (e.g. 7.4)" : "Enter your rating (e.g. 8)");
         if(val === null) return;
-        const m = getAllTitles().find(x => x.title === key);
+        const m = getAllTitles().find(x => (x.id||x.title) === key);
         if(m){
           if(type === "public") m.manualPublic = val || "—";
           else m.manualYou = val || "—";
@@ -162,6 +213,33 @@ async function render(){
       render();
     };
   });
+}
+
+function bindOpen(){
+  document.querySelectorAll("[data-open]").forEach(el => {
+    el.onclick = () => openDetail(el.dataset.open);
+  });
+}
+
+async function openDetail(id){
+  const m = getById(id);
+  if(!m) return;
+  await enrichTitle(m);
+  $("detail").innerHTML = `<div class="detail">
+    <h3>${m.title}</h3>
+    <div class="meta">Opened as full mother (same fields as a single title)</div>
+    <div class="meta">Disks: ${m.diskCount || 1}</div>
+    ${m.fromPackage ? `<div class="meta">From package: ${m.fromPackage}</div>` : ""}
+    <div class="flags">
+      <span class="flag own">Owned</span>
+      <span class="flag ${homoFlags[m.id]?"gay-yes":"gay-no"}">Homosexual scenes: ${homoFlags[m.id]?"yes":"no"}</span>
+      <span class="flag imdb">IMDb: ${m.publicRating || "—"}</span>
+      <span class="flag you">You: ${ratingsById[m.imdbId] || m.manualYou || "—"}</span>
+    </div>
+    <button id="closeDetail">Close</button>
+  </div>`;
+  $("closeDetail").onclick = () => { $("detail").innerHTML = ""; };
+  $("detail").scrollIntoView({behavior:"smooth"});
 }
 
 function renderFriends(){
@@ -196,7 +274,7 @@ $("collFile").onchange = async e => {
   const iIdx = header.indexOf("imdbid");
   collection = lines.slice(1).map(line => {
     const cells = line.split(";");
-    return { title: (cells[tIdx]||"").trim(), imdbId: (cells[iIdx]||"").trim() };
+    return makeMother((cells[tIdx]||"").trim(), { imdbId: (cells[iIdx]||"").trim() });
   }).filter(m=>m.title);
   saveColl();
   render();
@@ -220,9 +298,38 @@ $("rateFile").onchange = async e => {
 $("addBtn").onclick = async () => {
   const t = $("newTitle").value.trim();
   if(!t) return;
-  manualTitles.unshift({ title: t });
+  manualTitles.unshift(makeMother(t));
   saveManual();
   $("newTitle").value = "";
+  render();
+};
+
+$("addChildBtn").onclick = () => {
+  const title = $("childTitle").value.trim();
+  const mid = $("motherIdInput").value.trim();
+  if(!title || !mid) return;
+  const mother = getById(mid);
+  if(!mother){ alert("Mother ID not found"); return; }
+  const child = makeMother(title, {
+    motherId: mother.id,
+    fromPackage: mother.title,
+    diskCount: 1
+  });
+  mother.children.push(child.id);
+  if(collection.includes(mother)) collection.push(child);
+  else manualTitles.push(child);
+  saveColl(); saveManual();
+  $("childTitle").value = "";
+  render();
+};
+
+$("demoBtn").onclick = () => {
+  const mother = makeMother("Robert Shaw Double Feature", { diskCount: 2, barcode: "719710802421" });
+  const jaws = makeMother("Jaws", { motherId: mother.id, fromPackage: mother.title, diskCount: 1 });
+  const deep = makeMother("The Deep", { motherId: mother.id, fromPackage: mother.title, diskCount: 1 });
+  mother.children = [jaws.id, deep.id];
+  manualTitles.unshift(mother, jaws, deep);
+  saveManual();
   render();
 };
 
