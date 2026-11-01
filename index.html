@@ -2,338 +2,1055 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Movie Desk 0.4.5</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movie Desk 0.4.2</title>
 <style>
-body{margin:0;background:#111;color:#eee;font-family:system-ui,sans-serif;padding:12px}
-h1{margin:0 0 4px;font-size:1.6rem}
-.sub{color:#888;margin-bottom:12px}
-button,input{font-size:1rem}
-button{background:#2a2a2a;color:#fff;border:1px solid #444;border-radius:8px;padding:8px 14px;margin:4px}
-input{background:#222;color:#fff;border:1px solid #444;border-radius:8px;padding:10px;width:100%;box-sizing:border-box}
-.row{display:flex;gap:8px;margin:8px 0}
-.card{background:#1a1a1a;border:1px solid #333;border-radius:10px;padding:12px;margin:8px 0}
-.title{font-weight:600;margin-bottom:6px}
-.meta{color:#888;font-size:0.85rem;margin:4px 0}
-.flags{display:flex;flex-wrap:wrap;gap:6px}
-.flag{padding:4px 10px;border-radius:20px;font-size:0.85rem;cursor:pointer}
-.own{background:#1e3a2f;color:#8fd}
-.gay-yes{background:#3a1e2a;color:#f8a}
-.gay-no{background:#1e2a3a;color:#8af}
-.imdb{background:#2a2a1a;color:#e0c07a}
-.you{background:#0a2a2a;color:#00e5ff}
-.pkg{background:#2a1a2a;color:#e0a0e0}
-.child-list{margin-top:8px;border-top:1px solid #333;padding-top:8px}
-.child-item{background:#222;border:1px solid #444;border-radius:6px;padding:8px;margin:4px 0;cursor:pointer}
-.child-item:hover{background:#2a2a2a}
-.detail{background:#1a1a1a;border:1px solid #555;border-radius:10px;padding:16px;margin:12px 0}
-.modal{position:fixed;inset:0;background:#000a;display:none;align-items:center;justify-content:center}
-.modal.show{display:flex}
-.modal-box{background:#222;padding:20px;border-radius:12px;max-width:360px}
+  body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
+  header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
+  h1 { margin: 0; }
+  .sub { color: #888; font-size: 0.8rem; }
+  main { padding: 16px; max-width: 680px; margin: 0 auto; }
+  input[type=search], input[type=text] { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #fff; margin: 12px 0; box-sizing: border-box; }
+  .add-wrap, .buy-wrap { position: relative; margin-bottom: 8px; }
+  .add-row, .buy-row { display: flex; gap: 8px; align-items: center; }
+  .add-row input, .buy-row input { flex: 1; margin: 0; }
+  button { background: #222; color: #eee; border: 1px solid #444; padding: 0 16px; border-radius: 12px; cursor: pointer; height: 48px; }
+  .suggest, .buy-results { position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; max-height: 240px; overflow-y: auto; z-index: 20; display: none; }
+  .suggest.show, .buy-results.show { display: block; }
+  .suggest div, .buy-results div { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #2a2a2a; }
+  .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
+  #scanner { display: none; margin: 12px 0; }
+  #scanner video { width: 100%; border-radius: 12px; background: #000; }
+  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .title { font-weight: 500; cursor: pointer; }
+  .flags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .flag { padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .own { background: #1a3a2a; color: #7dcea0; }
+  .gay-no { background: #1a2a3a; color: #8ab4e0; cursor: pointer; }
+  .gay-yes { background: #3a1a2a; color: #e08ab4; cursor: pointer; }
+  .imdb { background: #2a2a1a; color: #e0c07a; }
+.you { background: #0a2a2a; color: #00e5ff; }
+  .editor { margin-top: 10px; padding-top: 10px; border-top: 1px solid #2a2a2a; display: none; }
+  .editor.show { display: block; }
+  .editor button { height: auto; padding: 8px 14px; }
+  label.load { display: inline-block; background: #222; border: 1px solid #444; padding: 10px 14px; border-radius: 8px; cursor: pointer; margin-right: 8px; }
+  input[type=file] { display: none; }
+  .section-label { color: #888; font-size: 0.85rem; margin: 16px 0 4px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; }
+  .modal.show { display: flex; }
+  .modal-box { background: #1a1a1a; border: 1px solid #333; border-radius: 16px; padding: 20px; max-width: 320px; width: 90%; }
+  .modal-box p { margin: 0 0 16px; white-space: pre-line; }
+  .modal-box label { display: block; margin: 8px 0; font-size: 0.9rem; }
+  .modal-box button { height: auto; background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; float: right; }
 </style>
 </head>
 <body>
-<h1>Movie Desk 0.4.5</h1>
-<div class="sub" id="counts">Ready</div>
-<button id="settingsBtn" style="float:right;height:32px;margin-top:-28px;">Settings</button>
-
-<div class="row">
-  <button id="loadColl">Load Collection CSV</button>
-  <button id="loadRate">Load Ratings CSV</button>
-  <button id="demoBtn">Add Demo Pack</button>
-</div>
-<input type="file" id="collFile" accept=".csv" hidden>
-<input type="file" id="rateFile" accept=".csv" hidden>
-
-<div style="margin:16px 0 4px">Add Title (creates a mother)</div>
-<div class="row">
-  <input id="newTitle" placeholder="Add title or barcode...">
-  <button id="addBtn">Add</button>
-</div>
-
-<div style="margin:16px 0 4px">Add Child to Mother</div>
-<div class="row">
-  <input id="childTitle" placeholder="Child title...">
-  <input id="motherIdInput" placeholder="Mother ID..." style="max-width:140px">
-  <button id="addChildBtn">Add Child</button>
-</div>
-
-<input id="q" placeholder="Search your titles..." style="margin:12px 0">
-<div id="out"></div>
-<div id="detail"></div>
+<header>
+  <h1>Movie Desk 0.4.2</h1>
+  <div class="sub" id="counts">Ready</div>
+  <button id="settingsBtn" style="float:right;height:32px;margin-top:-28px;">Settings</button>
+</header>
+<main>
+  <div>
+    <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
+    <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
+  </div>
+  <div class="section-label">Add Title</div>
+  <div class="add-wrap">
+    <div class="add-row">
+      <input type="text" id="newTitle" placeholder="Add title or barcode…" autocomplete="off">
+      <button id="addBtn">Add</button>
+      <button id="scanBtn">Scan</button>
+    </div>
+    <div class="suggest" id="suggest"></div>
+  </div>
+  <div class="section-label">Buy Lookup</div>
+  <div class="buy-wrap">
+    <div class="buy-row">
+      <input type="text" id="buyQuery" placeholder="Search to buy…" autocomplete="off">
+      <button id="buyBtn">Search</button>
+    </div>
+    <div class="buy-results" id="buyResults"></div>
+  </div>
+  <div id="barcodeStatus" style="display:none; font-size:0.75rem; color:#aaa; margin:6px 0 10px; padding:8px; background:#161616; border-radius:8px; border:1px solid #2a2a2a;"></div>
+  <div id="scanner"><video id="video" autoplay playsinline></video></div>
+  <input type="search" id="q" placeholder="Search your titles…">
+  <div id="out"></div>
+</main>
 
 <div class="modal" id="settingsModal">
-  <div class="modal-box">
+  <div class="modal-box" style="max-width:360px;">
     <p>Friends ratings</p>
     <div id="friendsList"></div>
-    <input type="text" id="newFriend" placeholder="Friend name" style="margin:8px 0;">
-    <button id="addFriendBtn">Add</button>
+    <input type="text" id="newFriend" placeholder="Friend name" style="width:100%;margin:8px 0;padding:8px;background:#222;color:#fff;border:1px solid #444;border-radius:8px;">
+    <button id="addFriendBtn" style="margin-right:8px;">Add</button>
     <button id="settingsClose">Close</button>
   </div>
 </div>
-
+<div class="modal" id="confirmModal">
+  <div class="modal-box">
+    <p id="confirmText"></p>
+    <label><input type="checkbox" id="disableSession"> Disable for this session</label>
+    <label><input type="checkbox" id="disablePermanent"> Disable</label>
+    <button id="confirmOk">OK</button>
+  </div>
+</div>
 <script>
+const $ = id => document.getElementById(id);
 const OMDB_KEY = "8d83ba51";
-let collection = JSON.parse(localStorage.getItem("md_coll") || "[]");
-let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
+let collection = [];
 let ratingsById = JSON.parse(localStorage.getItem("md_ratings") || "{}");
 let friends = JSON.parse(localStorage.getItem("md_friends") || "[]");
 let friendVisible = JSON.parse(localStorage.getItem("md_friend_vis") || "{}");
 let homoFlags = JSON.parse(localStorage.getItem("md_homo") || "{}");
-let ratingCache = JSON.parse(localStorage.getItem("md_rating_cache") || "{}");
+let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
+manualTitles = manualTitles.map(t => typeof t === "string" ? { title: t, imdbId: "" } : t);
+let openEditor = null;
+let scanning = false;
+let stream = null;
+let confirmDisabledSession = false;
+let confirmDisabledPermanent = localStorage.getItem("md_confirm_off") === "1";
 
-function $(id){return document.getElementById(id)}
-function norm(s){return (s||"").toLowerCase().trim()}
-function saveColl(){localStorage.setItem("md_coll", JSON.stringify(collection))}
-function saveManual(){localStorage.setItem("md_manual", JSON.stringify(manualTitles))}
-function saveRatings(){localStorage.setItem("md_ratings", JSON.stringify(ratingsById))}
-function saveFriends(){localStorage.setItem("md_friends", JSON.stringify(friends)); localStorage.setItem("md_friend_vis", JSON.stringify(friendVisible))}
-function saveHomo(){localStorage.setItem("md_homo", JSON.stringify(homoFlags))}
-function saveCache(){localStorage.setItem("md_rating_cache", JSON.stringify(ratingCache))}
-
-function makeId(){return "id-"+Math.random().toString(36).slice(2,10)}
-
-function makeMother(title, extra={}){
-  return {
-    id: makeId(),
-    title,
-    barcode: extra.barcode || "",
-    isMother: true,
-    diskCount: extra.diskCount || 1,
-    children: extra.children || [],
-    motherId: extra.motherId || null,
-    fromPackage: extra.fromPackage || null,
-    imdbId: extra.imdbId || "",
-    publicRating: extra.publicRating || "",
-    edition: extra.edition || "",
-    notes: extra.notes || ""
-  };
+function norm(s) { return (s||"").toLowerCase().replace(/[^a-z0-9]+/g," ").trim(); }
+function parseSemi(text) {
+  const lines = text.replace(/^\uFEFF/,"").trim().split(/\r?\n/);
+  return lines.slice(1).map(line => {
+    const cells = line.split(";");
+    return { title: (cells[0]||"").trim(), imdbId: (cells[8]||"").trim() };
+  }).filter(r => r.title);
 }
-
-function cleanTitle(t){
-  return (t||"")
-    .replace(/\(.*?\)/g, "")
-    .replace(/\[.*?\]/g, "")
-    .replace(/dvd|blu-?ray|4k|uhd|steelbook|season \d+|complete|disc set|checkpoint|fox mod comedy/gi, "")
-    .replace(/[-–—:]/g, " ")
-    .replace(/\s+/g, " ")
-    .trim();
-}
-
-function getAllTitles(){
-  return [...collection, ...manualTitles];
-}
-
-function getById(id){
-  return getAllTitles().find(x => x.id === id);
-}
-
-async function enrichTitle(m){
-  const key = m.title;
-  if(ratingCache[key]){
-    m.imdbId = ratingCache[key].imdbId || m.imdbId;
-    m.publicRating = ratingCache[key].publicRating || m.publicRating;
-    return m;
-  }
-  const search = cleanTitle(m.title);
-  if(!search) return m;
-  try{
-    const res = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(search)}&apikey=${OMDB_KEY}`);
-    const d = await res.json();
-    if(d.imdbID){
-      m.imdbId = d.imdbID;
-      if(d.imdbRating && d.imdbRating !== "N/A") m.publicRating = d.imdbRating;
-      ratingCache[key] = { imdbId: m.imdbId, publicRating: m.publicRating };
-      saveCache();
+function parseRatings(text) {
+  const lines = text.replace(/^\uFEFF/,"").trim().split(/\r?\n/);
+  if (!lines.length) return {};
+  const headers = lines[0].split(",").map(h => h.trim().replace(/^"|"$/g,""));
+  const constIdx = headers.findIndex(h => h === "Const");
+  const ratingIdx = headers.findIndex(h => h === "Your Rating");
+  if (constIdx < 0 || ratingIdx < 0) return {};
+  const map = {};
+  for (let i = 1; i < lines.length; i++) {
+    const line = lines[i];
+    // simple CSV split that respects quotes
+    const cells = [];
+    let cur = "", inQ = false;
+    for (let c of line) {
+      if (c === '"') { inQ = !inQ; continue; }
+      if (c === ',' && !inQ) { cells.push(cur); cur = ""; }
+      else cur += c;
     }
-  }catch(e){}
-  return m;
+    cells.push(cur);
+    const id = (cells[constIdx] || "").trim();
+    const rating = (cells[ratingIdx] || "").trim();
+    if (id && rating) map[id] = rating;
+  }
+  return map;
 }
-
-function renderCard(m, isChildView=false){
-  const key = m.id || m.title;
-  const isYes = !!homoFlags[key];
-  const you = ratingsById[m.imdbId] || m.manualYou || "—";
-  const pub = m.publicRating || m.manualPublic || "—";
-  const pkgNote = m.fromPackage ? `<span class="flag pkg">From: ${m.fromPackage}</span>` : "";
-  const childHtml = (m.children && m.children.length)
-    ? `<div class="child-list">
-         <div class="meta">Children in this package:</div>
-         ${m.children.map(cid => {
-           const c = getById(cid);
-           return c ? `<div class="child-item" data-open="${c.id}">${c.title}</div>` : "";
-         }).join("")}
-       </div>`
-    : "";
-  return `<div class="card" data-id="${m.id}">
-    <div class="title">${m.title}</div>
-    <div class="meta">Disks: ${m.diskCount || 1} &nbsp;|&nbsp; ID: ${m.id}</div>
-    <div class="flags">
-      <span class="flag own">Owned</span>
-      ${pkgNote}
-      <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
-      <span class="flag imdb" data-type="public" data-key="${key}">IMDb: ${pub}</span>
-      <span class="flag you" data-type="you" data-key="${key}">You: ${you}</span>
-    </div>
-    ${childHtml}
-  </div>`;
+function saveHomo() { localStorage.setItem("md_homo", JSON.stringify(homoFlags)); }
+function saveManual() { localStorage.setItem("md_manual", JSON.stringify(manualTitles)); }
+function saveRatings() { localStorage.setItem("md_ratings", JSON.stringify(ratingsById)); }
+function saveFriends() { localStorage.setItem("md_friends", JSON.stringify(friends)); localStorage.setItem("md_friend_vis", JSON.stringify(friendVisible)); }
+function showPopup(message) {
+  if (confirmDisabledPermanent || confirmDisabledSession) return;
+  $("confirmText").textContent = message;
+  $("disableSession").checked = false;
+  $("disablePermanent").checked = false;
+  $("confirmModal").classList.add("show");
 }
-
-async function render(){
-  const q = norm($("q").value);
-  let all = getAllTitles().filter(m => !q || norm(m.title).includes(q));
-  const toEnrich = all.slice(0, 20);
-  for(let m of toEnrich) await enrichTitle(m);
-  $("counts").textContent = `${all.length} shown / ${getAllTitles().length} total`;
-  $("out").innerHTML = all.slice(0,80).map(m => renderCard(m)).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
-  $("detail").innerHTML = "";
-  bindFlags();
-  bindOpen();
+$("confirmOk").onclick = () => {
+  if ($("disableSession").checked) confirmDisabledSession = true;
+  if ($("disablePermanent").checked) {
+    confirmDisabledPermanent = true;
+    localStorage.setItem("md_confirm_off", "1");
+  }
+  $("confirmModal").classList.remove("show");
+};
+function getAllTitles() {
+  const fromCsv = collection.map(m => ({ title: m.title, imdbId: m.imdbId }));
+  return [...manualTitles, ...fromCsv];
 }
-
-function bindFlags(){
-  document.querySelectorAll(".flag[data-key]").forEach(el => {
-    el.onclick = () => {
-      const key = el.dataset.key;
-      const type = el.dataset.type;
-      if(type === "public" || type === "you"){
-        const val = prompt(type === "public" ? "Enter IMDb rating (e.g. 7.4)" : "Enter your rating (e.g. 8)");
-        if(val === null) return;
-        const m = getAllTitles().find(x => (x.id||x.title) === key);
-        if(m){
-          if(type === "public") m.manualPublic = val || "—";
-          else m.manualYou = val || "—";
-          if(collection.includes(m)) saveColl();
-          else saveManual();
-        }
-      } else {
-        homoFlags[key] = !homoFlags[key];
-        saveHomo();
-      }
-      render();
+async function fetchSuggestions(query) {
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&type=movie&apikey=${OMDB_KEY}`);
+    const data = await res.json();
+    return data.Search ? data.Search.map(m => ({ title: m.Title, year: m.Year, imdbId: m.imdbID })) : [];
+  } catch (e) { return []; }
+}
+async function showSuggestions(val) {
+  const box = $("suggest");
+  if (!val || val.length < 4 || /^\d+$/.test(val)) {
+    box.classList.remove("show");
+    return;
+  }
+  const matches = await fetchSuggestions(val);
+  if (!matches.length) { box.classList.remove("show"); return; }
+  box.innerHTML = matches.slice(0, 8).map(m => `<div data-title="${m.title}" data-id="${m.imdbId}">${m.title} (${m.year})</div>`).join("");
+  box.classList.add("show");
+  box.querySelectorAll("div").forEach(d => {
+    d.onclick = () => {
+      $("newTitle").value = d.dataset.title;
+      $("newTitle").dataset.pendingId = d.dataset.id || "";
+      box.classList.remove("show");
     };
   });
 }
-
-function bindOpen(){
-  document.querySelectorAll("[data-open]").forEach(el => {
-    el.onclick = () => openDetail(el.dataset.open);
-  });
-}
-
-async function openDetail(id){
-  const m = getById(id);
-  if(!m) return;
-  await enrichTitle(m);
-  $("detail").innerHTML = `<div class="detail">
-    <h3>${m.title}</h3>
-    <div class="meta">Opened as full mother (same fields as a single title)</div>
-    <div class="meta">Disks: ${m.diskCount || 1}</div>
-    ${m.fromPackage ? `<div class="meta">From package: ${m.fromPackage}</div>` : ""}
-    <div class="flags">
-      <span class="flag own">Owned</span>
-      <span class="flag ${homoFlags[m.id]?"gay-yes":"gay-no"}">Homosexual scenes: ${homoFlags[m.id]?"yes":"no"}</span>
-      <span class="flag imdb">IMDb: ${m.publicRating || "—"}</span>
-      <span class="flag you">You: ${ratingsById[m.imdbId] || m.manualYou || "—"}</span>
-    </div>
-    <button id="closeDetail">Close</button>
-  </div>`;
-  $("closeDetail").onclick = () => { $("detail").innerHTML = ""; };
-  $("detail").scrollIntoView({behavior:"smooth"});
-}
-
-function renderFriends(){
+async function doBuySearch() {
+  const q = $("buyQuery").value.trim();
+  const box = $("buyResults");
+  if (q.length < 2) { box.classList.remove("show"); return; }
+  const matches = await fetchSuggestions(q);
+  if (!matches.length) { box.innerHTML = "<div>No results</div>"; box.classList.add("show"); return; }
+  box.innerHTML = matches.slice(0, 10).map(m => `<div data-title="${m.title}" data-id="${m.imdbId}">${m.title} (${m.year})</div>`).join("");
+  box.classList.add("show");
+  box.querySelectorAll("div").forEach(d => {
+    d.onclick = () => {
+      manualTitles.unshift({ title: d.dataset.title, imdbId: d.dataset.id || "" });
+      saveManual();
+      box.classList.remove("show");
+      $("buyQuery").value = "";
+      showPopup(`Confirmed: ${d.dataset.title}\nYou can now set the flag on it in the list below.`);
+      
+function renderFriends() {
   const box = $("friendsList");
   box.innerHTML = friends.map(f => `
     <label style="display:block;margin:6px 0;">
       <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
     </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
   box.querySelectorAll("input").forEach(cb => {
-    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); render(); };
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
   });
 }
 $("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
 $("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
 $("addFriendBtn").onclick = () => {
   const name = $("newFriend").value.trim();
-  if(!name || friends.includes(name)) return;
+  if (!name || friends.includes(name)) return;
   friends.push(name);
   friendVisible[name] = true;
   saveFriends();
   $("newFriend").value = "";
   renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
   render();
+}
+
+render();
 };
 
-$("loadColl").onclick = () => $("collFile").click();
-$("collFile").onchange = async e => {
-  const text = await e.target.files[0].text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  const header = lines[0].split(";").map(h=>h.trim().toLowerCase());
-  const tIdx = header.indexOf("title");
-  const iIdx = header.indexOf("imdbid");
-  collection = lines.slice(1).map(line => {
-    const cells = line.split(";");
-    return makeMother((cells[tIdx]||"").trim(), { imdbId: (cells[iIdx]||"").trim() });
-  }).filter(m=>m.title);
-  saveColl();
-  render();
-};
+// Fetch public IMDb rating when we have an id
 
-$("loadRate").onclick = () => $("rateFile").click();
-$("rateFile").onchange = async e => {
-  const text = await e.target.files[0].text();
-  const lines = text.split(/\r?\n/).filter(Boolean);
-  ratingsById = {};
-  lines.slice(1).forEach(line => {
-    const cells = line.split(",");
-    const id = (cells[0]||"").replace(/"/g,"").trim();
-    const rating = (cells[1]||"").replace(/"/g,"").trim();
-    if(id && rating) ratingsById[id] = rating;
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+    };
   });
-  saveRatings();
+}
+async function trySource(name, url, parse) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { name, ok: false, title: null };
+    const data = await res.json();
+    const title = parse(data);
+    return { name, ok: !!title, title: title || null };
+  } catch (e) {
+    return { name, ok: false, title: null };
+  }
+}
+
+async function lookupBarcode(code) {
+  const clean = (code || "").replace(/\D/g, "");
+  if (!clean) return null;
+  const candidates = [clean];
+  if (clean.length === 13 && clean.startsWith("0")) candidates.push(clean.slice(1));
+  if (clean.length === 12) candidates.push("0" + clean);
+
+  const results = [];
+  let foundTitle = null;
+
+  for (const c of candidates) {
+    if (foundTitle) break;
+    // UPCitemdb
+    const upc = await trySource("UPCitemdb",
+      `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
+      d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
+    results.push(upc);
+    if (upc.title) foundTitle = upc.title;
+
+    // UPCMDB (movie-focused)
+    if (!foundTitle) {
+      const upcm = await trySource("UPCMDB",
+        `https://upcmdb.com/api/v1/lookup/${encodeURIComponent(c)}`,
+        d => d.data && d.data.title);
+      results.push(upcm);
+      if (upcm.title) foundTitle = upcm.title;
+    }
+
+    // Open Library (weak for movies but free)
+    if (!foundTitle) {
+      const ol = await trySource("OpenLibrary",
+        `https://openlibrary.org/isbn/${encodeURIComponent(c)}.json`,
+        d => d.title);
+      results.push(ol);
+      if (ol.title) foundTitle = ol.title;
+    }
+  }
+
+  // Show status lights
+  const status = $("barcodeStatus");
+  if (status) {
+    status.style.display = "block";
+    const lines = results.map(r => (r.ok ? "??" : "??") + " " + r.name).join("<br>");
+    status.innerHTML = "<b>Barcode lookup:</b><br>" + results.map(r => (r.ok ? "OK" : "FAIL") + " — " + r.name).join("<br>");
+  }
+
+  return { title: foundTitle, source: (results.find(r => r.title) || {}).name || "none", results: results };
+}
+function stopScan() {
+  scanning = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  $("scanner").style.display = "none";
+  $("video").srcObject = null;
+}
+async function startScan() {
+  if (scanning) { stopScan(); return; }
+  if (!window.BarcodeDetector) { showPopup("Barcode scanning not supported. Use Chrome on Android."); return; }
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    const video = $("video");
+    video.srcObject = stream;
+    $("scanner").style.display = "block";
+    scanning = true;
+    const detector = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
+
+    // Give time to focus before detection starts
+    const status = $("barcodeStatus");
+    status.style.display = "block";
+    status.innerHTML = "Hold steady — starting in 2 seconds...";
+    await new Promise(r => setTimeout(r, 2000));
+    if (!scanning) return;
+    status.innerHTML = "Ready — hold the barcode in frame";
+
+    let stable = null;
+    let stableCount = 0;
+    const loop = async () => {
+      if (!scanning) return;
+      try {
+        const codes = await detector.detect(video);
+        if (codes.length) {
+          const raw = codes[0].rawValue;
+          if (raw === stable) {
+            stableCount++;
+          } else {
+            stable = raw;
+            stableCount = 1;
+          }
+          // Require the same code for ~1s of frames before accepting
+          if (stableCount >= 15) {
+            stopScan();
+            status.style.display = "none";
+            const result = await lookupBarcode(raw);
+            const title = result && result.title ? result.title : null;
+            const source = result && result.source ? result.source : "none";
+            $("newTitle").value = title || raw;
+            $("newTitle").dataset.pendingId = "";
+            const failed = (result.results || []).filter(r => !r.ok).map(r => r.name).join(", ");
+            showPopup(title ? "Found via " + source + ": " + title : "Scanned " + raw + " — no title match. Tried: " + (failed || "none"));
+            return;
+          }
+        } else {
+          stable = null;
+          stableCount = 0;
+        }
+      } catch (e) {}
+      if (scanning) requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {
+    showPopup("Could not start camera.");
+    stopScan();
+  }
+}
+function render() {
+  const q = norm($("q").value);
+  const all = getAllTitles().filter(m => !q || norm(m.title).includes(q));
+  $("out").innerHTML = all.slice(0,80).map(m => {
+    const key = m.title; // shared flag by title
+    const isYes = !!homoFlags[key];
+    const isOpen = openEditor === key;
+    return `<div class="card">
+      <div class="title" data-key="${key}">${m.title}</div>
+      <div class="flags">
+        <span class="flag own">Owned</span>
+        <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
+        <span class="flag imdb">IMDb: ${m.publicRating||"—"}</span>
+        <span class="flag you">You: ${ratingsById[m.imdbId]||"—"}</span>
+        ${friends.filter(f=>friendVisible[f]).map(f=>`<span class="flag imdb">${f}: ${m.friendRatings?.[f]||"—"}</span>`).join("")}
+      </div>
+      <div class="editor ${isOpen?"show":""}">
+        <button data-set="yes" data-key="${key}">Set Yes</button>
+        <button data-set="no" data-key="${key}">Set No</button>
+        <button data-set="close" data-key="${key}">Close</button>
+      </div>
+    </div>`;
+  }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
+  document.querySelectorAll(".flag[data-key]").forEach(el => {
+    el.onclick = e => { e.stopPropagation(); homoFlags[el.dataset.key] = !homoFlags[el.dataset.key]; saveHomo(); 
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
   render();
+}
+
+render(); };
+  });
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
 };
 
-$("addBtn").onclick = async () => {
-  const t = $("newTitle").value.trim();
-  if(!t) return;
-  manualTitles.unshift(makeMother(t));
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+  document.querySelectorAll(".title[data-key]").forEach(el => {
+    el.onclick = () => { openEditor = openEditor === el.dataset.key ? null : el.dataset.key; 
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+};
+
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+  document.querySelectorAll(".editor button").forEach(btn => {
+    btn.onclick = e => {
+      e.stopPropagation();
+      const k = btn.dataset.key;
+      if (btn.dataset.set === "yes") homoFlags[k] = true;
+      if (btn.dataset.set === "no") homoFlags[k] = false;
+      openEditor = null;
+      saveHomo();
+      
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+};
+
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+    };
+  });
+}
+async function doAdd() {
+  let t = $("newTitle").value.trim();
+  if (!t) return;
+  let imdbId = $("newTitle").dataset.pendingId || "";
+  if (/^\d{8,14}$/.test(t)) {
+    const found = await lookupBarcode(t);
+    if (found) { showPopup("Found: " + found); t = found; imdbId = ""; }
+    else showPopup("No match for barcode. Adding the number.");
+  }
+  manualTitles.unshift({ title: t, imdbId });
   saveManual();
   $("newTitle").value = "";
+  $("newTitle").dataset.pendingId = "";
+  $("suggest").classList.remove("show");
+  
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
   render();
-};
+}
 
-$("addChildBtn").onclick = () => {
-  const title = $("childTitle").value.trim();
-  const mid = $("motherIdInput").value.trim();
-  if(!title || !mid) return;
-  const mother = getById(mid);
-  if(!mother){ alert("Mother ID not found"); return; }
-  const child = makeMother(title, {
-    motherId: mother.id,
-    fromPackage: mother.title,
-    diskCount: 1
+render(); };
   });
-  mother.children.push(child.id);
-  if(collection.includes(mother)) collection.push(child);
-  else manualTitles.push(child);
-  saveColl(); saveManual();
-  $("childTitle").value = "";
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
   render();
+}
+
+render();
 };
 
-$("demoBtn").onclick = () => {
-  const mother = makeMother("Robert Shaw Double Feature", { diskCount: 2, barcode: "719710802421" });
-  const jaws = makeMother("Jaws", { motherId: mother.id, fromPackage: mother.title, diskCount: 1 });
-  const deep = makeMother("The Deep", { motherId: mother.id, fromPackage: mother.title, diskCount: 1 });
-  mother.children = [jaws.id, deep.id];
-  manualTitles.unshift(mother, jaws, deep);
-  saveManual();
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
   render();
+}
+
+render();
+}
+$("addBtn").onclick = doAdd;
+$("newTitle").onkeydown = e => { if (e.key === "Enter") { e.preventDefault(); doAdd(); } };
+$("newTitle").oninput = () => showSuggestions($("newTitle").value);
+$("buyQuery").oninput = () => {
+  const val = $("buyQuery").value.trim();
+  if (val.length >= 4) doBuySearch();
+  else $("buyResults").classList.remove("show");
+};
+$("scanBtn").onclick = startScan;
+$("buyBtn").onclick = doBuySearch;
+$("buyQuery").onkeydown = e => { if (e.key === "Enter") doBuySearch(); };
+$("fcol").onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  collection = parseSemi(await file.text());
+  $("counts").textContent = (collection.length + manualTitles.length) + " titles";
+  
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
 };
 
-$("q").oninput = () => render();
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+};
+$("frat").onchange = async e => {
+  const file = e.target.files[0];
+  if (!file) return;
+  ratingsById = parseRatings(await file.text());
+  saveRatings();
+  const all = getAllTitles();
+  const matched = all.filter(m => m.imdbId && ratingsById[m.imdbId]).length;
+  $("counts").textContent = all.length + " titles · " + matched + " rated";
+  
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+};
+
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+};
+$("q").oninput = render;
+document.addEventListener("click", e => {
+  if (!e.target.closest(".add-wrap")) $("suggest").classList.remove("show");
+  if (!e.target.closest(".buy-wrap")) $("buyResults").classList.remove("show");
+});
+
+function renderFriends() {
+  const box = $("friendsList");
+  box.innerHTML = friends.map(f => `
+    <label style="display:block;margin:6px 0;">
+      <input type="checkbox" data-friend="${f}" ${friendVisible[f]?"checked":""}> ${f}
+    </label>`).join("") || "<div style='color:#777'>No friends yet</div>";
+  box.querySelectorAll("input").forEach(cb => {
+    cb.onchange = () => { friendVisible[cb.dataset.friend] = cb.checked; saveFriends(); 
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render(); };
+  });
+}
+$("settingsBtn").onclick = () => { renderFriends(); $("settingsModal").classList.add("show"); };
+$("settingsClose").onclick = () => $("settingsModal").classList.remove("show");
+$("addFriendBtn").onclick = () => {
+  const name = $("newFriend").value.trim();
+  if (!name || friends.includes(name)) return;
+  friends.push(name);
+  friendVisible[name] = true;
+  saveFriends();
+  $("newFriend").value = "";
+  renderFriends();
+  
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
+render();
+};
+
+// Fetch public IMDb rating when we have an id
+
+
+
+async function enrichPublic(entry) {
+  if (!entry.imdbId || entry.publicRating) return entry;
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?i=${entry.imdbId}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d.imdbRating && d.imdbRating !== "N/A") entry.publicRating = d.imdbRating;
+  } catch(e) {}
+  return entry;
+}
+async function enrichAll() {
+  const all = [...collection, ...manualTitles];
+  for (const m of all) await enrichPublic(m);
+  saveCollection();
+  render();
+}
+
 render();
 </script>
 </body>
