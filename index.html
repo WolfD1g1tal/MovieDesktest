@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.5.0</title>
+<title>Movie Desk 0.6.0</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -22,8 +22,10 @@
   #scanner { display: none; margin: 12px 0; }
   #scanner video { width: 100%; border-radius: 12px; background: #000; }
   .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
-  .title { font-weight: 500; }
-  .flags { display: flex; gap: 6px; margin-top: 8px; flex-wrap: wrap; }
+  .title { font-weight: 500; cursor: pointer; }
+  .child-list { margin-top: 8px; margin-left: 24px; border-left: 2px solid #6a3a8a; padding-left: 10px; display: none; }
+  .child-list.show { display: block; }
+  .child-item { background: #2a1a3a; border: 1px solid #5a3a7a; border-radius: 6px; padding: 8px; margin: 4px 0; color: #d0a0e0; }
   .flag { padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
   .own { background: #1a3a2a; color: #7dcea0; }
   .gay-no { background: #1a2a3a; color: #8ab4e0; cursor: pointer; }
@@ -46,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.5.0</h1>
+  <h1>Movie Desk 0.6.0</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -233,18 +235,25 @@ async function startScan(target) {
   if (scanning) { stopScan(); return; }
   if (!window.BarcodeDetector) { showPopup("Barcode scanning not supported. Use Chrome on Android."); return; }
   scanTarget = target;
+  const status = $("barcodeStatus");
+  status.style.display = "block";
+  status.innerHTML = "Starting camera…";
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     const video = $("video");
     video.srcObject = stream;
     $("scanner").style.display = "block";
+    await video.play();
     scanning = true;
     const detector = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
 
-    const status = $("barcodeStatus");
-    status.style.display = "block";
-    status.innerHTML = "Hold steady — starting in 2 seconds...";
-    await new Promise(r => setTimeout(r, 2000));
+    // Wait until the video has frames
+    status.innerHTML = "Focusing — hold steady…";
+    let readyTries = 0;
+    while (video.readyState < 2 && readyTries < 30 && scanning) {
+      await new Promise(r => setTimeout(r, 100));
+      readyTries++;
+    }
     if (!scanning) return;
     status.innerHTML = "Ready — hold the barcode in frame";
 
@@ -256,26 +265,34 @@ async function startScan(target) {
         const codes = await detector.detect(video);
         if (codes.length) {
           const raw = codes[0].rawValue;
+          status.innerHTML = "Saw: " + raw + " (" + stableCount + ")";
           if (raw === stable) stableCount++;
           else { stable = raw; stableCount = 1; }
-          if (stableCount >= 15) {
+          if (stableCount >= 8) {
+            const rawFinal = raw;
             stopScan();
-            status.style.display = "none";
-            const result = await lookupBarcode(raw);
+            status.innerHTML = "Looking up " + rawFinal + "…";
+            const result = await lookupBarcode(rawFinal);
             const title = result && result.title ? result.title : null;
             const field = target === "mother" ? $("motherTitle") : $("childTitle");
-            field.value = title || raw;
-            field.dataset.barcode = result ? result.barcode : raw;
-            showPopup(title ? "Found via " + result.source + ": " + title : "Scanned " + raw + " — no title match.");
+            field.value = title || rawFinal;
+            field.dataset.barcode = result ? result.barcode : rawFinal;
+            showPopup(title ? "Found via " + result.source + ": " + title : "Scanned " + rawFinal + " — no title match.");
             return;
           }
-        } else { stable = null; stableCount = 0; }
-      } catch (e) {}
+        } else {
+          stable = null;
+          stableCount = 0;
+          status.innerHTML = "Looking… hold the barcode steady";
+        }
+      } catch (e) {
+        status.innerHTML = "Detect error: " + (e.message || e);
+      }
       if (scanning) requestAnimationFrame(loop);
     };
     loop();
   } catch (e) {
-    showPopup("Could not start camera.");
+    showPopup("Could not start camera: " + (e.message || e));
     stopScan();
   }
 }
@@ -302,18 +319,29 @@ async function omdbSuggest(query, box) {
 
 function render() {
   const q = norm($("q").value);
-  const all = getAll().filter(m => !q || norm(m.title).includes(q));
+  let all = getAll();
+  if (q) {
+    const matches = all.filter(m => norm(m.title).includes(q));
+    const ids = new Set(matches.map(m => m.id));
+    matches.forEach(m => {
+      if (m.motherId && !ids.has(m.motherId)) {
+        const mother = getById(m.motherId);
+        if (mother) ids.add(mother.id);
+      }
+    });
+    all = all.filter(m => ids.has(m.id));
+  }
   $("counts").textContent = `${all.length} shown / ${getAll().length} total`;
   $("out").innerHTML = all.slice(0,80).map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const isYes = !!homoFlags[key];
     const pkgNote = m.fromPackage ? `<span class="flag pkg">From mother</span>` : "";
-    const childHtml = (m.children && m.children.length)
-      ? `<div class="child-list"><div style="color:#888;font-size:0.8rem">Children:</div>${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}</div>` : ""; }).join("")}</div>`
+    const childHtml = (m.isMother && m.children && m.children.length)
+      ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " · " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
       : "";
     return `<div class="card">
-      <div class="title">${m.title}</div>
-      <div style="color:#777;font-size:0.8rem">ID: ${m.id}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""}</div>
+      <div class="title" data-mother="${m.isMother ? m.id : ""}">${m.title}</div>
+      <div style="color:#777;font-size:0.8rem">ID: ${m.id}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""}${m.isMother ? ` <button data-copy="${m.id}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;">Copy ID</button>` : ""}</div>
       <div class="flags">
         <span class="flag own">Owned</span>
         ${pkgNote}
@@ -330,6 +358,23 @@ function render() {
       homoFlags[k] = !homoFlags[k];
       saveHomo();
       render();
+    };
+  });
+  document.querySelectorAll(".title[data-mother]").forEach(el => {
+    const mid = el.dataset.mother;
+    if (!mid) return;
+    el.onclick = () => {
+      const list = document.querySelector(`.child-list[data-mother="${mid}"]`);
+      if (list) list.classList.toggle("show");
+    };
+  });
+  document.querySelectorAll("button[data-copy]").forEach(btn => {
+    btn.onclick = () => {
+      navigator.clipboard.writeText(btn.dataset.copy).then(() => {
+        const old = btn.textContent;
+        btn.textContent = "Copied";
+        setTimeout(() => btn.textContent = old, 1000);
+      });
     };
   });
 }
