@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.0</title>
+<title>Movie Desk 0.6.1</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -341,7 +341,7 @@ function render() {
       : "";
     return `<div class="card">
       <div class="title" data-mother="${m.isMother ? m.id : ""}">${m.title}</div>
-      <div style="color:#777;font-size:0.8rem">ID: ${m.id}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""}${m.isMother ? ` <button data-copy="${m.id}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;">Copy ID</button>` : ""}</div>
+      <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""}${m.isMother ? ` <button data-copy="${m.id}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button>` : ""}</div>
       <div class="flags">
         <span class="flag own">Owned</span>
         ${pkgNote}
