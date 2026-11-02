@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.16</title>
+<title>Movie Desk 0.6.17</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.16</h1>
+  <h1>Movie Desk 0.6.17</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -379,9 +379,10 @@ async function startScan(target) {
 
             const matches = (result && result.matches) || [];
             if (matches.length) {
-              box.innerHTML = matches.map(m =>
-                `<div data-title="${m.title.replace(/"/g,""")}" data-source="${m.source}">${m.title} <span style="color:#888;font-size:0.75rem">(${m.source})</span></div>`
-              ).join("");
+              box.innerHTML = matches.map(m => {
+                const safe = (m.title || "").replace(/"/g, "&quot;");
+                return `<div data-title="${safe}" data-source="${m.source}">${m.title} <span style="color:#888;font-size:0.75rem">(${m.source})</span></div>`;
+              }).join("");
               box.classList.add("show");
               box.querySelectorAll("div").forEach(el => {
                 el.onclick = () => {
