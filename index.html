@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.6</title>
+<title>Movie Desk 0.6.7</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.6</h1>
+  <h1>Movie Desk 0.6.7</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -197,16 +197,47 @@ function makeChild(title, motherId, extra={}){
   };
 }
 
+function cleanTitle(raw) {
+  if (!raw) return "";
+  let t = raw;
+  // Strip common physical media suffixes and studio noise
+  t = t.replace(/\s*[\(\[]?\s*(Blu[- ]?ray|BluRay|BD|DVD|4K|UHD|Ultra\s*HD|Digital|Combo|Pack|Disc|Edition|Special|Collector|Steelbook|Slipcover).*[\)\]]?/gi, "");
+  t = t.replace(/\s*[-–—]\s*(Blu[- ]?ray|DVD|4K).*$/gi, "");
+  t = t.replace(/\s*\d+\s*Disc(s)?\b/gi, "");
+  t = t.replace(/\s*\([^)]*\)\s*$/g, ""); // trailing paren groups
+  t = t.replace(/\s+/g, " ").trim();
+  return t || raw;
+}
+
 async function trySource(name, url, parse) {
   try {
     const res = await fetch(url);
-    if (!res.ok) return { name, ok: false, title: null };
+    if (!res.ok) return { name, ok: false, title: null, data: null };
     const data = await res.json();
     const title = parse(data);
-    return { name, ok: !!title, title: title || null };
+    return { name, ok: !!title, title: title || null, data };
   } catch (e) {
-    return { name, ok: false, title: null };
+    return { name, ok: false, title: null, data: null };
   }
+}
+
+async function refineWithOMDB(rawTitle) {
+  const cleaned = cleanTitle(rawTitle);
+  if (!cleaned || cleaned.length < 3) return { title: rawTitle, imdbId: "", rating: "", refined: false };
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(cleaned)}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d && d.Response === "True" && d.Title) {
+      return {
+        title: d.Title,
+        imdbId: d.imdbID || "",
+        rating: d.imdbRating || "",
+        year: d.Year || "",
+        refined: true
+      };
+    }
+  } catch (e) {}
+  return { title: cleaned || rawTitle, imdbId: "", rating: "", refined: false };
 }
 
 async function lookupBarcode(code) {
@@ -218,38 +249,67 @@ async function lookupBarcode(code) {
 
   const results = [];
   let foundTitle = null;
+  let sourceName = "none";
 
   for (const c of candidates) {
     if (foundTitle) break;
-    const upc = await trySource("UPCitemdb",
+    // Primary: CORS-friendly proxy wrapping UPCitemdb
+    const upc = await trySource("UPCitemdb-proxy",
       `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
       d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
     results.push(upc);
-    if (upc.title) foundTitle = upc.title;
-
-    if (!foundTitle) {
-      const upcm = await trySource("UPCMDB",
-        `https://upcmdb.com/api/v1/lookup/${encodeURIComponent(c)}`,
-        d => d.data && d.data.title);
-      results.push(upcm);
-      if (upcm.title) foundTitle = upcm.title;
+    if (upc.title) {
+      foundTitle = upc.title;
+      sourceName = "UPCitemdb-proxy";
     }
 
+    // Secondary: GTINHub (may fail CORS in browser; kept as optional)
+    if (!foundTitle) {
+      const gtin = await trySource("GTINHub",
+        `https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
+        d => d.found && d.product && (d.product.name || d.product.title) || null);
+      results.push(gtin);
+      if (gtin.title) {
+        foundTitle = gtin.title;
+        sourceName = "GTINHub";
+      }
+    }
+
+    // Book fallback
     if (!foundTitle) {
       const ol = await trySource("OpenLibrary",
         `https://openlibrary.org/isbn/${encodeURIComponent(c)}.json`,
         d => d.title);
       results.push(ol);
-      if (ol.title) foundTitle = ol.title;
+      if (ol.title) {
+        foundTitle = ol.title;
+        sourceName = "OpenLibrary";
+      }
     }
+  }
+
+  let refined = { title: foundTitle, imdbId: "", rating: "", refined: false };
+  if (foundTitle) {
+    refined = await refineWithOMDB(foundTitle);
   }
 
   const status = $("barcodeStatus");
   if (status) {
     status.style.display = "block";
-    status.innerHTML = "<b>Barcode lookup:</b><br>" + results.map(r => (r.ok ? "OK" : "FAIL") + " — " + r.name).join("<br>");
+    const lines = results.map(r => (r.ok ? "OK" : "FAIL") + " — " + r.name).join("<br>");
+    const extra = refined.refined ? `<br><b>OMDB refined:</b> ${refined.title}${refined.rating ? " · " + refined.rating : ""}` : "";
+    status.innerHTML = "<b>Barcode lookup:</b><br>" + lines + extra;
   }
-  return { title: foundTitle, source: (results.find(r => r.title) || {}).name || "none", results, barcode: clean };
+
+  return {
+    title: refined.title || foundTitle,
+    imdbId: refined.imdbId || "",
+    publicRating: refined.rating || "",
+    source: sourceName,
+    results,
+    barcode: clean,
+    refined: refined.refined
+  };
 }
 
 function stopScan() {
@@ -307,9 +367,11 @@ async function startScan(target) {
             const field = target === "mother" ? $("motherTitle") : $("childTitle");
             field.value = title || rawFinal;
             field.dataset.barcode = result ? result.barcode : rawFinal;
-            // force the value to stick
+            if (result && result.imdbId) field.dataset.imdbId = result.imdbId;
+            if (result && result.publicRating) field.dataset.publicRating = result.publicRating;
             field.setAttribute("value", field.value);
-            showPopup(title ? "Found via " + result.source + ": " + title : "Scanned " + rawFinal + " — no title match.");
+            const note = result && result.refined ? " (OMDB refined)" : "";
+            showPopup(title ? "Found via " + result.source + note + ": " + title : "Scanned " + rawFinal + " — no title match.");
             return;
           }
         } else {
@@ -424,13 +486,14 @@ $("motherAddBtn").onclick = () => {
   const field = $("motherTitle");
   const t = (field.value || "").trim() || field.dataset.barcode || "";
   if (!t) { showPopup("Nothing to add."); return; }
-  const m = makeMother(t, { barcode: field.dataset.barcode || "", imdbId: field.dataset.imdbId || "" });
+  const m = makeMother(t, { barcode: field.dataset.barcode || "", imdbId: field.dataset.imdbId || "", publicRating: field.dataset.publicRating || "" });
   manualTitles.unshift(m);
   saveManual();
   manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
   field.value = "";
   field.dataset.barcode = "";
   field.dataset.imdbId = "";
+  field.dataset.publicRating = "";
   $("motherSuggest").classList.remove("show");
   showPopup("Added: " + m.title + " | ID: " + m.id + " | Total: " + getAll().length);
   showLastId(m.id, m.title);
@@ -445,7 +508,7 @@ $("childAddBtn").onclick = () => {
   if (!t || !mid) { showPopup("Need child title and mother ID."); return; }
   const mother = getById(mid);
   if (!mother || !mother.isMother) { showPopup("Mother ID not found."); return; }
-  const c = makeChild(t, mid, { barcode: $("childTitle").dataset.barcode || mother.barcode || "", imdbId: $("childTitle").dataset.imdbId || "" });
+  const c = makeChild(t, mid, { barcode: $("childTitle").dataset.barcode || mother.barcode || "", imdbId: $("childTitle").dataset.imdbId || "", publicRating: $("childTitle").dataset.publicRating || "" });
   manualTitles.push(c);
   mother.children = mother.children || [];
   mother.children.push(c.id);
@@ -453,6 +516,7 @@ $("childAddBtn").onclick = () => {
   $("childTitle").value = "";
   $("childTitle").dataset.barcode = "";
   $("childTitle").dataset.imdbId = "";
+  $("childTitle").dataset.publicRating = "";
   $("motherIdInput").value = "";
   $("childSuggest").classList.remove("show");
   showPopup("Child added to mother: " + c.title);
