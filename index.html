@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.2</title>
+<title>Movie Desk 0.6.3</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.2</h1>
+  <h1>Movie Desk 0.6.3</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -68,6 +68,10 @@
   </div>
 
   <div class="section-label">Add Child to Mother</div>
+  <div id="lastIdBar" style="font-size:0.8rem;color:#aaa;margin:2px 0 8px;display:flex;align-items:center;gap:8px;">
+    <span id="lastIdText">Last ID: —</span>
+    <button id="lastIdCopy" style="height:22px;padding:0 8px;font-size:0.7rem;background:#333;border:1px solid #555;color:#fff;">Copy</button>
+  </div>
   <div class="add-wrap">
     <div class="add-row">
       <input type="text" id="childTitle" placeholder="Child title or barcode…" autocomplete="off">
@@ -117,7 +121,23 @@ function saveColl(){ localStorage.setItem("md_coll", JSON.stringify(collection))
 function saveManual(){ localStorage.setItem("md_manual", JSON.stringify(manualTitles)); }
 function saveHomo(){ localStorage.setItem("md_homo", JSON.stringify(homoFlags)); }
 function norm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
-function makeId(){ return "id-"+Math.random().toString(36).slice(2,10); }
+let lastAddedId = "";
+function showLastId(id, title){
+  lastAddedId = id || "";
+  const txt = $("lastIdText");
+  if (txt) txt.textContent = id ? ("Last ID: " + id + (title ? " · " + title : "")) : "Last ID: —";
+  const btn = $("lastIdCopy");
+  if (btn) btn.dataset.copy = id || "";
+}
+$("lastIdCopy").onclick = () => {
+  const id = $("lastIdCopy").dataset.copy;
+  if (!id) return;
+  navigator.clipboard.writeText(id).then(() => {
+    const old = $("lastIdCopy").textContent;
+    $("lastIdCopy").textContent = "Copied";
+    setTimeout(() => $("lastIdCopy").textContent = old, 1000);
+  });
+};
 
 function showPopup(msg){
   if (sessionStorage.getItem("md_popup_off") === "1") return;
@@ -372,10 +392,16 @@ function render() {
   });
   document.querySelectorAll(".title[data-mother]").forEach(el => {
     const mid = el.dataset.mother;
-    if (!mid) return;
     el.onclick = () => {
-      const list = document.querySelector(`.child-list[data-mother="${mid}"]`);
-      if (list) list.classList.toggle("show");
+      if (mid) {
+        const list = document.querySelector(`.child-list[data-mother="${mid}"]`);
+        if (list) list.classList.toggle("show");
+      }
+      const card = el.closest(".card");
+      const idLine = card && card.querySelector("button[data-copy]");
+      const id = idLine ? idLine.dataset.copy : "";
+      const title = el.textContent.trim();
+      if (id) showLastId(id, title);
     };
   });
   document.querySelectorAll("button[data-copy]").forEach(btn => {
@@ -403,6 +429,7 @@ $("motherAddBtn").onclick = () => {
   $("motherTitle").dataset.imdbId = "";
   $("motherSuggest").classList.remove("show");
   showPopup("Mother added: " + m.title + "\nID: " + m.id);
+  showLastId(m.id, m.title);
   render();
 };
 
@@ -423,6 +450,7 @@ $("childAddBtn").onclick = () => {
   $("motherIdInput").value = "";
   $("childSuggest").classList.remove("show");
   showPopup("Child added to mother: " + c.title);
+  showLastId(c.id, c.title);
   render();
 };
 
