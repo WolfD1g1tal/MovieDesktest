@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.7</title>
+<title>Movie Desk 0.6.9</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.8</h1>
+  <h1>Movie Desk 0.6.9</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -165,6 +165,10 @@ function fixMissingIds(){
   if (changed) { saveColl(); saveManual(); }
 }
 fixMissingIds();
+
+function makeId(){
+  return "id-" + Math.random().toString(36).slice(2, 10);
+}
 
 function makeMother(title, extra={}){
   return {
