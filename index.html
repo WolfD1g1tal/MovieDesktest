@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.5</title>
+<title>Movie Desk 0.6.6</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.5</h1>
+  <h1>Movie Desk 0.6.6</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -425,17 +425,18 @@ $("motherAddBtn").onclick = () => {
   const t = (field.value || "").trim() || field.dataset.barcode || "";
   if (!t) { showPopup("Nothing to add."); return; }
   const m = makeMother(t, { barcode: field.dataset.barcode || "", imdbId: field.dataset.imdbId || "" });
-  manualTitles.push(m);
+  manualTitles.unshift(m);
   saveManual();
-  // re-read to confirm it stuck
   manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
   field.value = "";
   field.dataset.barcode = "";
   field.dataset.imdbId = "";
   $("motherSuggest").classList.remove("show");
-  showPopup("Mother added: " + m.title + "\nID: " + m.id + "\nTotal now: " + getAll().length);
+  showPopup("Added: " + m.title + " | ID: " + m.id + " | Total: " + getAll().length);
   showLastId(m.id, m.title);
   render();
+  // force the counts line to refresh even if render has an issue
+  if ($("counts")) $("counts").textContent = getAll().length + " shown / " + getAll().length + " total";
 };
 
 $("childAddBtn").onclick = () => {
