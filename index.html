@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.11</title>
+<title>Movie Desk 0.6.13</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.11</h1>
+  <h1>Movie Desk 0.6.13</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -252,68 +252,58 @@ async function lookupBarcode(code) {
   if (clean.length === 12) candidates.push("0" + clean);
 
   const results = [];
-  let foundTitle = null;
-  let sourceName = "none";
+  const matches = []; // {title, source}
 
-  for (const c of candidates) {
-    if (foundTitle) break;
+  // Always try all sources on the primary barcode
+  const c = candidates[0];
 
-    // 1st: GTINHub via CORS proxy (browser-safe; more precise titles when it hits)
-    const gtin = await trySource("GTINHub",
-      `https://proxy.cors.dev/https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
-      d => d.found && d.product && (d.product.name || d.product.title) || null);
-    results.push(gtin);
-    if (gtin.title) {
-      foundTitle = gtin.title;
-      sourceName = "GTINHub";
-    }
+  // 1st: GTINHub via CORS proxy
+  const gtin = await trySource("GTINHub",
+    `https://proxy.cors.dev/https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
+    d => d.found && d.product && (d.product.name || d.product.title) || null);
+  results.push(gtin);
+  if (gtin.title) matches.push({ title: gtin.title, source: "GTINHub" });
 
-    // 2nd: OpenLibrary (books only — usually fails for movie barcodes)
-    if (!foundTitle) {
-      const ol = await trySource("OpenLibrary",
-        `https://openlibrary.org/isbn/${encodeURIComponent(c)}.json`,
-        d => d.title);
-      results.push(ol);
-      if (ol.title) {
-        foundTitle = ol.title;
-        sourceName = "OpenLibrary";
-      }
-    }
+  // 2nd: OpenLibrary
+  const ol = await trySource("OpenLibrary",
+    `https://openlibrary.org/isbn/${encodeURIComponent(c)}.json`,
+    d => d.title);
+  results.push(ol);
+  if (ol.title) matches.push({ title: ol.title, source: "OpenLibrary" });
 
-    // 3rd: UPCitemdb via proxy (CORS-friendly backup)
-    if (!foundTitle) {
-      const upc = await trySource("UPCitemdb-proxy",
-        `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
+  // 3rd: UPCitemdb via proxy
+  const upc = await trySource("UPCitemdb-proxy",
+    `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
+    d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
+  results.push(upc);
+  if (upc.title) matches.push({ title: upc.title, source: "UPCitemdb-proxy" });
+
+  // Alternate candidates on proxy only if nothing found
+  if (!matches.length && candidates.length > 1) {
+    for (const alt of candidates.slice(1)) {
+      const altUpc = await trySource("UPCitemdb-proxy-alt",
+        `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(alt)}`,
         d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
-      results.push(upc);
-      if (upc.title) {
-        foundTitle = upc.title;
-        sourceName = "UPCitemdb-proxy";
+      results.push(altUpc);
+      if (altUpc.title) {
+        matches.push({ title: altUpc.title, source: "UPCitemdb-proxy" });
+        break;
       }
     }
-  }
-
-  let refined = { title: foundTitle, imdbId: "", rating: "", refined: false };
-  if (foundTitle) {
-    refined = await refineWithOMDB(foundTitle);
   }
 
   const status = $("barcodeStatus");
   if (status) {
     status.style.display = "block";
     const lines = results.map(r => (r.ok ? "OK" : "FAIL") + " — " + r.name).join("<br>");
-    const extra = refined.refined ? `<br><b>OMDB refined:</b> ${refined.title}${refined.rating ? " · " + refined.rating : ""}` : "";
-    status.innerHTML = "<b>Barcode lookup:</b><br>" + lines + extra;
+    status.innerHTML = "<b>Barcode lookup:</b><br>" + lines +
+      (matches.length ? "<br><b>Matches found:</b> " + matches.length : "");
   }
 
   return {
-    title: refined.title || foundTitle,
-    imdbId: refined.imdbId || "",
-    publicRating: refined.rating || "",
-    source: sourceName,
+    matches,
     results,
-    barcode: clean,
-    refined: refined.refined
+    barcode: clean
   };
 }
 
