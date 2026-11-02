@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.9</title>
+<title>Movie Desk 0.6.11</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.9</h1>
+  <h1>Movie Desk 0.6.11</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -258,9 +258,9 @@ async function lookupBarcode(code) {
   for (const c of candidates) {
     if (foundTitle) break;
 
-    // 1st: GTINHub (tended to return more precise titles in testing)
+    // 1st: GTINHub via CORS proxy (browser-safe; more precise titles when it hits)
     const gtin = await trySource("GTINHub",
-      `https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
+      `https://proxy.cors.dev/https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
       d => d.found && d.product && (d.product.name || d.product.title) || null);
     results.push(gtin);
     if (gtin.title) {
@@ -268,7 +268,7 @@ async function lookupBarcode(code) {
       sourceName = "GTINHub";
     }
 
-    // 2nd: OpenLibrary (books / occasional media)
+    // 2nd: OpenLibrary (books only — usually fails for movie barcodes)
     if (!foundTitle) {
       const ol = await trySource("OpenLibrary",
         `https://openlibrary.org/isbn/${encodeURIComponent(c)}.json`,
@@ -280,7 +280,7 @@ async function lookupBarcode(code) {
       }
     }
 
-    // 3rd: UPCitemdb via proxy (general product DB; less precise for some packs)
+    // 3rd: UPCitemdb via proxy (CORS-friendly backup)
     if (!foundTitle) {
       const upc = await trySource("UPCitemdb-proxy",
         `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
@@ -437,7 +437,7 @@ function render() {
   $("out").innerHTML = all.slice(0,80).map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const isYes = !!homoFlags[key];
-    const pkgNote = m.fromPackage ? `<span class="flag pkg">From mother</span>` : "";
+    const pkgNote = m.fromPackage ? `<span class="flag pkg" data-mother-id="${m.motherId||""}" style="cursor:pointer">From mother</span>` : "";
     const childHtml = (m.isMother && m.children && m.children.length)
       ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " · " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
       : "";
