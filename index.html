@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.17</title>
+<title>Movie Desk 0.2</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,13 +48,14 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.17</h1>
+  <h1>Movie Desk 0.2</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
   <div>
     <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
     <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
+    <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
   </div>
 
   <div class="section-label">Add Mother (package / single title)</div>
@@ -113,6 +114,21 @@ const $ = id => document.getElementById(id);
 let collection = JSON.parse(localStorage.getItem("md_coll") || "[]");
 let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
 let homoFlags = JSON.parse(localStorage.getItem("md_homo") || "{}");
+let boutiqueFlags = JSON.parse(localStorage.getItem("md_boutique") || "{}");
+const BOUTIQUE_LABELS = ["Arrow","Manta Labs","Kino Lorber","Criterion","Vinegar Syndrome","Severin","Scream Factory","Shout Factory","88 Films","Eureka","Indicator"];
+function stripBoutique(label) {
+  if (!label) return;
+  const l = label.toLowerCase();
+  const ids = Object.keys(boutiqueFlags).filter(id => (boutiqueFlags[id] || "").toLowerCase() === l);
+  if (!ids.length) { showPopup("No titles marked " + label); return; }
+  if (!confirm("Remove " + ids.length + " title(s) marked " + label + "?")) return;
+  manualTitles = manualTitles.filter(m => !ids.includes(m.id));
+  ids.forEach(id => delete boutiqueFlags[id]);
+  saveManual();
+  saveBoutique();
+  render();
+  showPopup("Stripped " + ids.length + " " + label + " title(s)");
+}
 let ratingsById = {};
 let scanning = false;
 let stream = null;
@@ -130,6 +146,10 @@ function showLastId(id, title){
   const btn = $("lastIdCopy");
   if (btn) btn.dataset.copy = id || "";
 }
+$("stripBoutiqueBtn").onclick = () => {
+  const label = prompt("Strip all titles marked with which boutique label?\n" + BOUTIQUE_LABELS.join(", "));
+  if (label) stripBoutique(label.trim());
+};
 $("lastIdCopy").onclick = () => {
   const id = $("lastIdCopy").dataset.copy;
   if (!id) return;
@@ -184,7 +204,8 @@ function makeMother(title, extra={}){
     imdbId: extra.imdbId || "",
     publicRating: extra.publicRating || "",
     edition: extra.edition || "",
-    notes: extra.notes || ""
+    notes: extra.notes || "",
+    boutiqueLabel: extra.boutiqueLabel || ""
   };
 }
 function makeChild(title, motherId, extra={}){
@@ -198,7 +219,8 @@ function makeChild(title, motherId, extra={}){
     imdbId: extra.imdbId || "",
     publicRating: extra.publicRating || "",
     edition: extra.edition || "",
-    notes: extra.notes || ""
+    notes: extra.notes || "",
+    boutiqueLabel: extra.boutiqueLabel || ""
   };
 }
 
@@ -457,6 +479,8 @@ function render() {
   $("out").innerHTML = all.slice(0,80).map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const isYes = !!homoFlags[key];
+    const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
+    const boutNote = bout ? `<span class="flag" style="background:#5a3a00;color:#ffd580" data-boutique="${m.id}">Boutique: ${bout}</span>` : `<span class="flag" style="background:#333;color:#aaa" data-boutique="${m.id}">+ Boutique</span>`;
     const pkgNote = m.fromPackage ? `<span class="flag pkg" data-mother-id="${m.motherId||""}" style="cursor:pointer">From mother</span>` : "";
     const childHtml = (m.isMother && m.children && m.children.length)
       ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " · " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
@@ -467,6 +491,7 @@ function render() {
       <div class="flags">
         <span class="flag own">Owned</span>
         ${pkgNote}
+        ${boutNote}
         <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
         <span class="flag imdb">IMDb: ${m.publicRating||"—"}</span>
       </div>
@@ -479,6 +504,19 @@ function render() {
       const k = el.dataset.key;
       homoFlags[k] = !homoFlags[k];
       saveHomo();
+      render();
+    };
+  });
+  document.querySelectorAll("[data-boutique]").forEach(el => {
+    el.onclick = () => {
+      const id = el.dataset.boutique;
+      const current = boutiqueFlags[id] || "";
+      const next = prompt("Boutique label (blank to clear):\n" + BOUTIQUE_LABELS.join(", "), current);
+      if (next === null) return;
+      const label = (next || "").trim();
+      if (label) boutiqueFlags[id] = label;
+      else delete boutiqueFlags[id];
+      saveBoutique();
       render();
     };
   });
