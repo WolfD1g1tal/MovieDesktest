@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.13</title>
+<title>Movie Desk 0.6.16</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.13</h1>
+  <h1>Movie Desk 0.6.16</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -108,6 +108,7 @@
 
 <script>
 const OMDB_KEY = "8d83ba51";
+const UPCDATABASE_KEY = ""; // paste your free key from upcdatabase.org here (optional)
 const $ = id => document.getElementById(id);
 let collection = JSON.parse(localStorage.getItem("md_coll") || "[]");
 let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
@@ -205,7 +206,7 @@ function cleanTitle(raw) {
   if (!raw) return "";
   let t = raw;
   // Strip common physical media suffixes and studio noise
-  t = t.replace(/\s*[\(\[]?\s*(Blu[- ]?ray|BluRay|BD|DVD|4K|UHD|Ultra\s*HD|Digital|Combo|Pack|Disc|Edition|Special|Collector|Steelbook|Slipcover).*[\)\]]?/gi, "");
+  t = t.replace(/\s*[\(\[]?\s*(Blu[- ]?ray|BluRay|BD|DVD|4K|UHD|Ultra\s*HD|Digital|Combo|Disc|Edition|Special|Collector|Steelbook|Slipcover).*[\)\]]?/gi, "");
   t = t.replace(/\s*[-–—]\s*(Blu[- ]?ray|DVD|4K).*$/gi, "");
   t = t.replace(/\s*\d+\s*Disc(s)?\b/gi, "");
   t = t.replace(/\s*\([^)]*\)\s*$/g, ""); // trailing paren groups
@@ -277,6 +278,15 @@ async function lookupBarcode(code) {
     d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
   results.push(upc);
   if (upc.title) matches.push({ title: upc.title, source: "UPCitemdb-proxy" });
+
+  // 4th: UPCDatabase.org (requires free API key — leave UPCDATABASE_KEY blank to skip)
+  if (UPCDATABASE_KEY) {
+    const upcdb = await trySource("UPCDatabase",
+      `https://proxy.cors.dev/https://api.upcdatabase.org/product/${encodeURIComponent(c)}?apikey=${UPCDATABASE_KEY}`,
+      d => (d.success && (d.title || d.itemname)) || null);
+    results.push(upcdb);
+    if (upcdb.title) matches.push({ title: upcdb.title, source: "UPCDatabase" });
+  }
 
   // Alternate candidates on proxy only if nothing found
   if (!matches.length && candidates.length > 1) {
@@ -353,23 +363,42 @@ async function startScan(target) {
           status.innerHTML = "Saw: " + raw + " (" + stableCount + ")";
           if (raw === stable) stableCount++;
           else { stable = raw; stableCount = 1; }
-          if (stableCount >= 8) {
+          status.innerHTML = "Saw: " + raw + " (" + stableCount + "/20)";
+          if (stableCount >= 20) {
             const rawFinal = raw;
+            status.innerHTML = "Locked — " + rawFinal + "…";
+            // short deliberate pause so the lock is visible
+            await new Promise(r => setTimeout(r, 600));
+            if (!scanning) return;
             stopScan();
             status.innerHTML = "Looking up " + rawFinal + "…";
             const result = await lookupBarcode(rawFinal);
-            const title = result && result.title ? result.title : null;
             const field = target === "mother" ? $("motherTitle") : $("childTitle");
-            field.value = title || rawFinal;
+            const box = target === "mother" ? $("motherSuggest") : $("childSuggest");
             field.dataset.barcode = result ? result.barcode : rawFinal;
-            if (result && result.imdbId) field.dataset.imdbId = result.imdbId;
-            if (result && result.publicRating) field.dataset.publicRating = result.publicRating;
-            field.setAttribute("value", field.value);
-            // close any open suggest so it doesn't overwrite the scanned title
-            $("motherSuggest").classList.remove("show");
-            $("childSuggest").classList.remove("show");
-            const note = result && result.refined ? " (OMDB refined)" : "";
-            showPopup(title ? "Found via " + result.source + note + ": " + title : "Scanned " + rawFinal + " — no title match.");
+
+            const matches = (result && result.matches) || [];
+            if (matches.length) {
+              box.innerHTML = matches.map(m =>
+                `<div data-title="${m.title.replace(/"/g,""")}" data-source="${m.source}">${m.title} <span style="color:#888;font-size:0.75rem">(${m.source})</span></div>`
+              ).join("");
+              box.classList.add("show");
+              box.querySelectorAll("div").forEach(el => {
+                el.onclick = () => {
+                  field.value = el.dataset.title;
+                  field.dataset.imdbId = "";
+                  field.dataset.publicRating = "";
+                  box.classList.remove("show");
+                  showPopup("Selected: " + el.dataset.title);
+                };
+              });
+              field.value = matches[0].title;
+              showPopup(matches.length + " match" + (matches.length>1?"es":"") + " — pick one from the list.");
+            } else {
+              field.value = rawFinal;
+              box.classList.remove("show");
+              showPopup("Scanned " + rawFinal + " — no title match.");
+            }
             return;
           }
         } else {
