@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.3</title>
+<title>Movie Desk 0.6.4</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.3</h1>
+  <h1>Movie Desk 0.6.4</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -307,6 +307,8 @@ async function startScan(target) {
             const field = target === "mother" ? $("motherTitle") : $("childTitle");
             field.value = title || rawFinal;
             field.dataset.barcode = result ? result.barcode : rawFinal;
+            // force the value to stick
+            field.setAttribute("value", field.value);
             showPopup(title ? "Found via " + result.source + ": " + title : "Scanned " + rawFinal + " — no title match.");
             return;
           }
@@ -419,14 +421,15 @@ $("motherTitle").oninput = () => omdbSuggest($("motherTitle").value, $("motherSu
 $("childTitle").oninput = () => omdbSuggest($("childTitle").value, $("childSuggest"));
 
 $("motherAddBtn").onclick = () => {
-  const t = $("motherTitle").value.trim();
-  if (!t) return;
-  const m = makeMother(t, { barcode: $("motherTitle").dataset.barcode || "", imdbId: $("motherTitle").dataset.imdbId || "" });
+  const field = $("motherTitle");
+  const t = (field.value || "").trim() || field.dataset.barcode || "";
+  if (!t) { showPopup("Nothing to add."); return; }
+  const m = makeMother(t, { barcode: field.dataset.barcode || "", imdbId: field.dataset.imdbId || "" });
   manualTitles.push(m);
   saveManual();
-  $("motherTitle").value = "";
-  $("motherTitle").dataset.barcode = "";
-  $("motherTitle").dataset.imdbId = "";
+  field.value = "";
+  field.dataset.barcode = "";
+  field.dataset.imdbId = "";
   $("motherSuggest").classList.remove("show");
   showPopup("Mother added: " + m.title + "\nID: " + m.id);
   showLastId(m.id, m.title);
