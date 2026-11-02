@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.7</h1>
+  <h1>Movie Desk 0.6.8</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -253,29 +253,18 @@ async function lookupBarcode(code) {
 
   for (const c of candidates) {
     if (foundTitle) break;
-    // Primary: CORS-friendly proxy wrapping UPCitemdb
-    const upc = await trySource("UPCitemdb-proxy",
-      `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
-      d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
-    results.push(upc);
-    if (upc.title) {
-      foundTitle = upc.title;
-      sourceName = "UPCitemdb-proxy";
+
+    // 1st: GTINHub (tended to return more precise titles in testing)
+    const gtin = await trySource("GTINHub",
+      `https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
+      d => d.found && d.product && (d.product.name || d.product.title) || null);
+    results.push(gtin);
+    if (gtin.title) {
+      foundTitle = gtin.title;
+      sourceName = "GTINHub";
     }
 
-    // Secondary: GTINHub (may fail CORS in browser; kept as optional)
-    if (!foundTitle) {
-      const gtin = await trySource("GTINHub",
-        `https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
-        d => d.found && d.product && (d.product.name || d.product.title) || null);
-      results.push(gtin);
-      if (gtin.title) {
-        foundTitle = gtin.title;
-        sourceName = "GTINHub";
-      }
-    }
-
-    // Book fallback
+    // 2nd: OpenLibrary (books / occasional media)
     if (!foundTitle) {
       const ol = await trySource("OpenLibrary",
         `https://openlibrary.org/isbn/${encodeURIComponent(c)}.json`,
@@ -284,6 +273,18 @@ async function lookupBarcode(code) {
       if (ol.title) {
         foundTitle = ol.title;
         sourceName = "OpenLibrary";
+      }
+    }
+
+    // 3rd: UPCitemdb via proxy (general product DB; less precise for some packs)
+    if (!foundTitle) {
+      const upc = await trySource("UPCitemdb-proxy",
+        `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
+        d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
+      results.push(upc);
+      if (upc.title) {
+        foundTitle = upc.title;
+        sourceName = "UPCitemdb-proxy";
       }
     }
   }
@@ -370,6 +371,9 @@ async function startScan(target) {
             if (result && result.imdbId) field.dataset.imdbId = result.imdbId;
             if (result && result.publicRating) field.dataset.publicRating = result.publicRating;
             field.setAttribute("value", field.value);
+            // close any open suggest so it doesn't overwrite the scanned title
+            $("motherSuggest").classList.remove("show");
+            $("childSuggest").classList.remove("show");
             const note = result && result.refined ? " (OMDB refined)" : "";
             showPopup(title ? "Found via " + result.source + note + ": " + title : "Scanned " + rawFinal + " — no title match.");
             return;
@@ -484,11 +488,18 @@ $("childTitle").oninput = () => omdbSuggest($("childTitle").value, $("childSugge
 
 $("motherAddBtn").onclick = () => {
   const field = $("motherTitle");
-  const t = (field.value || "").trim() || field.dataset.barcode || "";
+  let t = (field.value || "").trim();
+  if (!t && field.dataset.barcode) t = field.dataset.barcode;
   if (!t) { showPopup("Nothing to add."); return; }
-  const m = makeMother(t, { barcode: field.dataset.barcode || "", imdbId: field.dataset.imdbId || "", publicRating: field.dataset.publicRating || "" });
+  // Ensure we always have a usable title string even if lookup was partial
+  const m = makeMother(t, {
+    barcode: field.dataset.barcode || "",
+    imdbId: field.dataset.imdbId || "",
+    publicRating: field.dataset.publicRating || ""
+  });
   manualTitles.unshift(m);
   saveManual();
+  // re-read to confirm persistence
   manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
   field.value = "";
   field.dataset.barcode = "";
@@ -498,7 +509,6 @@ $("motherAddBtn").onclick = () => {
   showPopup("Added: " + m.title + " | ID: " + m.id + " | Total: " + getAll().length);
   showLastId(m.id, m.title);
   render();
-  // force the counts line to refresh even if render has an issue
   if ($("counts")) $("counts").textContent = getAll().length + " shown / " + getAll().length + " total";
 };
 
