@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6</title>
+<title>Movie Desk 0.6.003</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6</h1>
+  <h1>Movie Desk 0.6.003</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -95,6 +95,7 @@
     <button id="tabInventory" style="height:36px;">My Inventory</button>
     <button id="tabRated" style="height:36px;">Rated</button>
     <button id="tabWatch" style="height:36px;">Watchlist</button>
+    <button id="tabSettings" style="height:36px;">Settings</button>
   </div>
   <div id="watchControls" style="display:none;margin-bottom:10px;">
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
@@ -152,6 +153,106 @@ function stripBoutique(label) {
   showPopup("Stripped " + ids.length + " " + label + " title(s)");
 }
 let ratingsById = {};
+let myRatings = {};
+let dbPromise = null;
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open("MovieDesk", 1);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("ratings")) db.createObjectStore("ratings");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+async function idbGetAll(store) {
+  const db = await openDb();
+  return new Promise(resolve => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).getAll();
+    const keysReq = tx.objectStore(store).getAllKeys();
+    let vals, keys;
+    req.onsuccess = () => { vals = req.result; if (keys) finish(); };
+    keysReq.onsuccess = () => { keys = keysReq.result; if (vals) finish(); };
+    function finish() {
+      const map = {};
+      keys.forEach((k, i) => map[k] = vals[i]);
+      resolve(map);
+    }
+  });
+}
+async function idbPutMap(store, map) {
+  const db = await openDb();
+  return new Promise(resolve => {
+    const tx = db.transaction(store, "readwrite");
+    const os = tx.objectStore(store);
+    os.clear();
+    Object.keys(map).forEach(k => os.put(map[k], k));
+    tx.oncomplete = () => resolve();
+  });
+}
+async function idbClear(store) {
+  const db = await openDb();
+  return new Promise(resolve => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).clear();
+    tx.oncomplete = () => resolve();
+  });
+}
+async function loadRatingsFromDb() {
+  try {
+    myRatings = await idbGetAll("ratings");
+    const n = Object.keys(myRatings).length;
+    if (n && $("counts")) $("counts").textContent = (getAll ? getAll().length : 0) + " titles · " + n + " ratings indexed";
+  } catch(e) {}
+}
+function parseCsvLine(line) {
+  const out = [];
+  let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (c === "," && !inQ) { out.push(cur); cur = ""; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+function loadMyRatings() {
+  const el = $("frat");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const lines = (reader.result || "").split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) { showPopup("Empty file."); return; }
+      const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      const titleIdx = header.findIndex(h => h === "title");
+      const ratingIdx = header.findIndex(h => h === "your rating");
+      const imdbIdx = header.findIndex(h => h === "imdb rating");
+      const map = {};
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const title = (cols[titleIdx >= 0 ? titleIdx : 3] || "").trim();
+        const rating = (cols[ratingIdx >= 0 ? ratingIdx : 1] || "").trim();
+        if (title && rating) map[norm(title)] = rating;
+      }
+      myRatings = map;
+      await idbPutMap("ratings", myRatings);
+      localStorage.removeItem("md_my_ratings");
+      showPopup("Your ratings indexed: " + Object.keys(map).length);
+      render();
+    };
+    reader.readAsText(file);
+  };
+}
+loadMyRatings();
+loadRatingsFromDb();
 let scanning = false;
 let stream = null;
 let scanTarget = null; // "mother" or "child"
@@ -559,6 +660,7 @@ function render() {
         ${boutNote}
         <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
         <span class="flag imdb">IMDb: ${m.publicRating||"—"}</span>
+        ${myRatings[norm(m.title)] ? `<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ${myRatings[norm(m.title)]}</span>` : ""}
       </div>
       ${childHtml}
     </div>`;
@@ -695,6 +797,49 @@ function friendTagFor(title) {
   return ` <span class="flag" style="background:#2a1a3a;color:#d0a0e0;margin-left:6px;">${name}${r}</span>`;
 }
 
+function showSettings() {
+  const stores = [
+    { key: "md_manual", label: "Manual titles (added in app)", data: manualTitles },
+    { key: "md_coll", label: "Loaded collection", data: collection },
+    { key: "md_my_ratings", label: "Your IMDb ratings", data: myRatings },
+    { key: "md_friend_inv", label: "Friend inventory", data: friendInvTitles },
+    { key: "md_friend_ratings", label: "Friend ratings", data: friendRatings },
+    { key: "md_my_watch", label: "Personal watchlist", data: myWatchlist },
+    { key: "md_friend_watch", label: "Friend watchlist", data: friendWatchlist },
+    { key: "md_homo", label: "Homosexual-scenes flags", data: homoFlags },
+    { key: "md_boutique", label: "Boutique labels", data: boutiqueFlags }
+  ];
+  const box = $("sectionOut");
+  const rows = stores.map(s => {
+    const n = Array.isArray(s.data) ? s.data.length : Object.keys(s.data || {}).length;
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;">
+      <div>${s.label}<br><span style="color:#888;font-size:0.75rem">${s.key} · ${n} items</span></div>
+      <button data-clear="${s.key}" style="height:28px;padding:0 10px;font-size:0.75rem;background:#3a1a1a;color:#f88;">Clear</button>
+    </div>`;
+  }).join("");
+  box.innerHTML = `<b>Settings — stored in this browser</b>
+    <div style="color:#888;font-size:0.8rem;margin:6px 0 10px;">Nothing is saved to a folder until you tap Export Library. Exported CSVs go to your phone/browser Downloads folder.</div>
+    ${rows}`;
+  box.querySelectorAll("[data-clear]").forEach(btn => {
+    btn.onclick = () => {
+      const key = btn.dataset.clear;
+      if (!confirm("Clear " + key + "?")) return;
+      localStorage.removeItem(key);
+      if (key === "md_manual") manualTitles = [];
+      if (key === "md_coll") collection = [];
+      if (key === "md_my_ratings") { myRatings = {}; idbClear("ratings"); }
+      if (key === "md_friend_inv") friendInvTitles = [];
+      if (key === "md_friend_ratings") friendRatings = {};
+      if (key === "md_my_watch") myWatchlist = [];
+      if (key === "md_friend_watch") friendWatchlist = [];
+      if (key === "md_homo") Object.keys(homoFlags).forEach(k => delete homoFlags[k]);
+      if (key === "md_boutique") Object.keys(boutiqueFlags).forEach(k => delete boutiqueFlags[k]);
+      showPopup("Cleared " + key);
+      showSettings();
+      render();
+    };
+  });
+}
 function showSection(name) {
   currentSection = name;
   $("watchControls").style.display = name === "watch" ? "block" : "none";
@@ -790,6 +935,7 @@ loadListFile("myWatch", arr => { myWatchlist = arr; }, "md_my_watch");
 loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch");
 
 $("tabInventory").onclick = () => showSection("inventory");
+$("tabSettings").onclick = () => { currentSection = "settings"; $("watchControls").style.display = "none"; $("out").style.display = "none"; $("q").style.display = "none"; showSettings(); };
 $("tabRated").onclick = () => showSection("rated");
 $("tabWatch").onclick = () => showSection("watch");
 $("watchModePersonal").onclick = () => { watchMode = "personal"; renderWatch(); };
