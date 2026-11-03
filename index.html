@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.2</title>
+<title>Movie Desk 0.4</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.2</h1>
+  <h1>Movie Desk 0.4</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -83,7 +83,28 @@
     <div class="suggest" id="childSuggest"></div>
   </div>
 
-  <div class="section-label">Buy Lookup</div>
+  <div class="section-label">Friend Data</div>
+  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+    <input type="text" id="friendName" placeholder="Friend first name" style="max-width:160px;margin:0;">
+    <label class="load">Friend Inventory<input type="file" id="friendInv" accept=".csv,.txt"></label>
+    <label class="load">Friend Ratings<input type="file" id="friendRatings" accept=".csv,.txt"></label>
+  </div>
+  <div class="section-label">Sections</div>
+  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
+    <button id="tabInventory" style="height:36px;">My Inventory</button>
+    <button id="tabRated" style="height:36px;">Rated</button>
+    <button id="tabWatch" style="height:36px;">Watchlist</button>
+  </div>
+  <div id="watchControls" style="display:none;margin-bottom:10px;">
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+      <label class="load">Upload Personal Watchlist<input type="file" id="myWatch" accept=".csv,.txt"></label>
+      <label class="load">Upload Friend Watchlist<input type="file" id="friendWatch" accept=".csv,.txt"></label>
+      <button id="watchModePersonal" style="height:28px;padding:0 10px;font-size:0.75rem;">Personal</button>
+      <button id="watchModeFriend" style="height:28px;padding:0 10px;font-size:0.75rem;">Friend</button>
+      <button id="watchShared" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;">Shared Watchlist</button>
+    </div>
+  </div>
+  <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
   <div class="buy-wrap">
     <div class="buy-row">
       <input type="text" id="buyQuery" placeholder="Search to buy…" autocomplete="off">
@@ -485,8 +506,9 @@ function render() {
     const childHtml = (m.isMother && m.children && m.children.length)
       ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " · " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
       : "";
+    const friendTag = friendTagFor(m.title);
     return `<div class="card">
-      <div class="title" data-mother="${m.isMother ? m.id : ""}">${m.title}</div>
+      <div class="title" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
       <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
       <div class="flags">
         <span class="flag own">Owned</span>
@@ -613,8 +635,139 @@ $("buyBtn").onclick = async () => {
   } catch(e) { box.classList.remove("show"); }
 };
 
-$("q").oninput = render;
-render();
+let friendInvTitles = JSON.parse(localStorage.getItem("md_friend_inv") || "[]");
+let friendRatings = JSON.parse(localStorage.getItem("md_friend_ratings") || "{}");
+let myWatchlist = JSON.parse(localStorage.getItem("md_my_watch") || "[]");
+let friendWatchlist = JSON.parse(localStorage.getItem("md_friend_watch") || "[]");
+let currentSection = "inventory";
+let watchMode = "personal";
+
+function friendTagFor(title) {
+  const n = normTitle(title);
+  const inInv = friendInvTitles.some(t => normTitle(t) === n);
+  const rating = friendRatings[n];
+  if (!inInv && !rating) return "";
+  const name = ($("friendName") && $("friendName").value.trim()) || "Friend";
+  const r = rating ? " · " + rating : "";
+  return ` <span class="flag" style="background:#2a1a3a;color:#d0a0e0;margin-left:6px;">${name}${r}</span>`;
+}
+
+function showSection(name) {
+  currentSection = name;
+  $("watchControls").style.display = name === "watch" ? "block" : "none";
+  $("out").style.display = name === "inventory" ? "block" : "none";
+  $("q").style.display = name === "inventory" ? "block" : "none";
+  const box = $("sectionOut");
+  if (name === "inventory") { box.innerHTML = ""; render(); return; }
+  if (name === "rated") {
+    const mine = getAll().filter(m => m.publicRating);
+    const lines = mine.slice(0,60).map(m => {
+      const fr = friendRatings[normTitle(m.title)];
+      const name = ($("friendName") && $("friendName").value.trim()) || "Friend";
+      return `<div>${m.title} · IMDb: ${m.publicRating||"—"}${fr ? " · " + name + ": " + fr : ""}</div>`;
+    }).join("") || "<div style='color:#777'>No rated titles yet.</div>";
+    box.innerHTML = "<b>Rated</b><br>" + lines;
+    return;
+  }
+  if (name === "watch") renderWatch();
+}
+
+function renderWatch() {
+  const box = $("sectionOut");
+  const list = watchMode === "friend" ? friendWatchlist : myWatchlist;
+  const label = watchMode === "friend" ? "Friend Watchlist" : "Personal Watchlist";
+  const lines = list.slice(0,60).map(t => `<div>${t}</div>`).join("") || "<div style='color:#777'>Empty.</div>";
+  box.innerHTML = `<b>${label}</b> (${list.length})<br>` + lines;
+}
+
+function showSharedWatch() {
+  const mine = new Set(myWatchlist.map(normTitle));
+  const shared = friendWatchlist.filter(t => mine.has(normTitle(t)));
+  const box = $("sectionOut");
+  const lines = shared.slice(0,60).map(t => `<div>${t}</div>`).join("") || "<div style='color:#777'>No shared titles.</div>";
+  box.innerHTML = `<b>Shared Watchlist</b> (${shared.length})<br>` + lines;
+}
+
+function loadListFile(inputId, setter, storageKey) {
+  const el = $(inputId);
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const titles = parseFriendCsv(reader.result || "");
+      setter(titles);
+      localStorage.setItem(storageKey, JSON.stringify(titles));
+      showPopup("Loaded " + titles.length + " titles");
+      if (currentSection === "watch") renderWatch();
+      if (currentSection === "inventory") render();
+    };
+    reader.readAsText(file);
+  };
+}
+
+function loadRatingsFile() {
+  const el = $("friendRatings");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result || "";
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const header = (lines[0] || "").split(/[,;\t]/).map(h => h.trim().toLowerCase());
+      const titleIdx = header.findIndex(h => h === "title" || h === "name");
+      const ratingIdx = header.findIndex(h => h.includes("rating") || h === "your rating");
+      const map = {};
+      const start = (titleIdx >= 0 || ratingIdx >= 0) ? 1 : 0;
+      for (let i = start; i < lines.length; i++) {
+        const cols = lines[i].split(/[,;\t]/);
+        const title = (cols[titleIdx >= 0 ? titleIdx : 0] || "").replace(/^["']|["']$/g, "").trim();
+        const rating = (cols[ratingIdx >= 0 ? ratingIdx : 1] || "").replace(/^["']|["']$/g, "").trim();
+        if (title) map[normTitle(title)] = rating;
+      }
+      friendRatings = map;
+      localStorage.setItem("md_friend_ratings", JSON.stringify(friendRatings));
+      showPopup("Friend ratings loaded: " + Object.keys(map).length);
+      if (currentSection === "inventory") render();
+      if (currentSection === "rated") showSection("rated");
+    };
+    reader.readAsText(file);
+  };
+}
+
+$("friendName").oninput = () => { localStorage.setItem("md_friend_name", $("friendName").value); if (currentSection === "inventory") render(); };
+$("friendName").value = localStorage.getItem("md_friend_name") || "";
+
+loadListFile("friendInv", arr => { friendInvTitles = arr; }, "md_friend_inv");
+loadRatingsFile();
+loadListFile("myWatch", arr => { myWatchlist = arr; }, "md_my_watch");
+loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch");
+
+$("tabInventory").onclick = () => showSection("inventory");
+$("tabRated").onclick = () => showSection("rated");
+$("tabWatch").onclick = () => showSection("watch");
+$("watchModePersonal").onclick = () => { watchMode = "personal"; renderWatch(); };
+$("watchModeFriend").onclick = () => { watchMode = "friend"; renderWatch(); };
+$("watchShared").onclick = showSharedWatch;
+function normTitle(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function parseFriendCsv(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase());
+  const titleIdx = header.findIndex(h => h === "title" || h === "name" || h === "movie");
+  const start = titleIdx >= 0 ? 1 : 0;
+  const titles = [];
+  for (let i = start; i < lines.length; i++) {
+    const cols = lines[i].split(/[,;\t]/);
+    const raw = titleIdx >= 0 ? (cols[titleIdx] || "") : cols[0];
+    const t = raw.replace(/^["']|["']$/g, "").trim();
+    if (t && t.toLowerCase() !== "title") titles.push(t);
+  }
+  return titles;
+}
 </script>
 </body>
 </html>
