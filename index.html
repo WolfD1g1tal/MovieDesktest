@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.5</title>
+<title>Movie Desk 0.6</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.5</h1>
+  <h1>Movie Desk 0.6</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -56,6 +56,7 @@
     <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
     <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
     <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
+    <button id="exportBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;border-radius:6px;">Export Library</button>
   </div>
 
   <div class="section-label">Add Mother (package / single title)</div>
@@ -170,6 +171,33 @@ function showLastId(id, title){
 $("stripBoutiqueBtn").onclick = () => {
   const label = prompt("Strip all titles marked with which boutique label?\n" + BOUTIQUE_LABELS.join(", "));
   if (label) stripBoutique(label.trim());
+};
+$("exportBtn").onclick = () => {
+  const rows = [["title","barcode","type","motherId","boutique","homosexualScenes","imdbRating","friendRating"]];
+  const name = ($("friendName") && $("friendName").value.trim()) || "";
+  getAll().forEach(m => {
+    const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
+    const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
+    const homo = homoFlags[key] ? "yes" : "no";
+    const fr = friendRatings[norm(m.title)] || "";
+    rows.push([
+      m.title || "",
+      m.barcode || "",
+      m.isMother ? "mother" : "child",
+      m.motherId || "",
+      bout,
+      homo,
+      m.publicRating || "",
+      fr
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "MovieDesk-export.csv";
+  a.click();
+  showPopup("Exported " + (rows.length - 1) + " titles" + (name ? " (friend: " + name + ")" : ""));
 };
 $("lastIdCopy").onclick = () => {
   const id = $("lastIdCopy").dataset.copy;
