@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.4</title>
+<title>Movie Desk 0.5</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.4</h1>
+  <h1>Movie Desk 0.5</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -369,13 +369,28 @@ function stopScan() {
   scanTarget = null;
 }
 
+async function ensureBarcodeDetector() {
+  if (window.BarcodeDetector) return true;
+  return new Promise(resolve => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/barcode-detector@3/dist/iife/polyfill.min.js";
+    s.onload = () => resolve(!!window.BarcodeDetector);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
 async function startScan(target) {
   if (scanning) { stopScan(); return; }
-  if (!window.BarcodeDetector) { showPopup("Barcode scanning not supported. Use Chrome on Android."); return; }
-  scanTarget = target;
   const status = $("barcodeStatus");
   status.style.display = "block";
   status.innerHTML = "Starting camera…";
+  if (!window.BarcodeDetector) {
+    status.innerHTML = "Loading iPhone scanner…";
+    const ok = await ensureBarcodeDetector();
+    if (!ok) { showPopup("Barcode scanning not available in this browser."); return; }
+  }
+  scanTarget = target;
   try {
     stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
     const video = $("video");
