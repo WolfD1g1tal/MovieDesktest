@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.006</title>
+<title>Movie Desk 0.6.009</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.006</h1>
+  <h1>Movie Desk 0.6.009</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -121,7 +121,31 @@
   <div id="out"></div>
 </main>
 
-<div class="modal" id="modal">
+<div class="modal" id="editPanel">
+  <div class="modal-box" style="text-align:left;max-height:80vh;overflow:auto">
+    <p id="editTitle" style="font-weight:600;margin:0 0 8px"></p>
+    <label style="display:block;margin:6px 0">Source<br><input type="text" id="editSource" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">EAN / Barcode<br><input type="text" id="editEan" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">IMDb ID<br><input type="text" id="editImdbId" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Disc Type<br><input type="text" id="editDiscType" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Audio Format<br><input type="text" id="editAudioFormat" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Audio Channels<br><input type="text" id="editAudioChannels" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Edition<br><input type="text" id="editEdition" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Release<br><input type="text" id="editRelease" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Languages<br><input type="text" id="editLanguages" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Subtitles<br><input type="text" id="editSubtitles" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Runtime<br><input type="text" id="editRuntime" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Genres<br><input type="text" id="editGenres" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Director<br><input type="text" id="editDirector" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Composer<br><input type="text" id="editComposer" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Cinematographer<br><input type="text" id="editCinematographer" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Notes<br><input type="text" id="editNotes" style="width:100%;height:36px"></label>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="editSave">Save</button>
+      <button id="editCancel" style="background:#333">Cancel</button>
+    </div>
+  </div>
+</div>
   <div class="modal-box">
     <p id="modalMsg"></p>
     <label><input type="checkbox" id="modalDisable"> Disable</label>
@@ -342,6 +366,15 @@ function makeId(){
   return "id-" + Math.random().toString(36).slice(2, 10);
 }
 
+function detectDiscType(raw) {
+  if (!raw) return "";
+  const s = String(raw);
+  if (/ultra\s*hd|\buhd\b|\b4k\b/i.test(s)) return "Ultra HD";
+  if (/blu[- ]?ray|\bblu\b|\bbd\b/i.test(s)) return "Blu-ray";
+  if (/\bdvd\b/i.test(s)) return "DVD";
+  return "";
+}
+
 function makeMother(title, extra={}){
   return {
     id: makeId(),
@@ -356,7 +389,20 @@ function makeMother(title, extra={}){
     publicRating: extra.publicRating || "",
     edition: extra.edition || "",
     notes: extra.notes || "",
-    boutiqueLabel: extra.boutiqueLabel || ""
+    boutiqueLabel: extra.boutiqueLabel || "",
+    source: extra.source || "",
+    ean: extra.ean || extra.barcode || "",
+    discType: extra.discType || detectDiscType(extra.rawTitle || title),
+    audioFormat: extra.audioFormat || "",
+    audioChannels: extra.audioChannels || "",
+    release: extra.release || extra.year || "",
+    languages: extra.languages || "",
+    subtitles: extra.subtitles || "",
+    runtime: extra.runtime || "",
+    genres: extra.genres || "",
+    director: extra.director || "",
+    composer: extra.composer || "",
+    cinematographer: extra.cinematographer || ""
   };
 }
 function makeChild(title, motherId, extra={}){
@@ -371,7 +417,20 @@ function makeChild(title, motherId, extra={}){
     publicRating: extra.publicRating || "",
     edition: extra.edition || "",
     notes: extra.notes || "",
-    boutiqueLabel: extra.boutiqueLabel || ""
+    boutiqueLabel: extra.boutiqueLabel || "",
+    source: extra.source || "",
+    ean: extra.ean || extra.barcode || "",
+    discType: extra.discType || detectDiscType(extra.rawTitle || title),
+    audioFormat: extra.audioFormat || "",
+    audioChannels: extra.audioChannels || "",
+    release: extra.release || extra.year || "",
+    languages: extra.languages || "",
+    subtitles: extra.subtitles || "",
+    runtime: extra.runtime || "",
+    genres: extra.genres || "",
+    director: extra.director || "",
+    composer: extra.composer || "",
+    cinematographer: extra.cinematographer || ""
   };
 }
 
@@ -403,7 +462,7 @@ async function trySource(name, url, parse) {
 
 async function refineWithOMDB(rawTitle) {
   const cleaned = cleanTitle(rawTitle);
-  if (!cleaned || cleaned.length < 3) return { title: rawTitle, imdbId: "", rating: "", refined: false };
+  if (!cleaned || cleaned.length < 3) return { title: rawTitle, imdbId: "", rating: "", refined: false, discType: detectDiscType(rawTitle) };
   try {
     const res = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(cleaned)}&apikey=${OMDB_KEY}`);
     const d = await res.json();
@@ -413,11 +472,18 @@ async function refineWithOMDB(rawTitle) {
         imdbId: d.imdbID || "",
         rating: d.imdbRating || "",
         year: d.Year || "",
+        release: d.Released || d.Year || "",
+        runtime: d.Runtime || "",
+        genres: d.Genre || "",
+        director: d.Director || "",
+        languages: d.Language || "",
+        source: "OMDB",
+        discType: detectDiscType(rawTitle),
         refined: true
       };
     }
   } catch (e) {}
-  return { title: cleaned || rawTitle, imdbId: "", rating: "", refined: false };
+  return { title: cleaned || rawTitle, imdbId: "", rating: "", refined: false, discType: detectDiscType(rawTitle) };
 }
 
 async function lookupBarcode(code) {
@@ -582,6 +648,8 @@ async function startScan(target) {
             const field = target === "mother" ? $("motherTitle") : $("childTitle");
             const box = target === "mother" ? $("motherSuggest") : $("childSuggest");
             field.dataset.barcode = result ? result.barcode : rawFinal;
+            field.dataset.rawTitle = (matches[0] && matches[0].title) || rawFinal;
+            field.dataset.discType = detectDiscType(field.dataset.rawTitle);
 
             const matches = (result && result.matches) || [];
             if (matches.length) {
@@ -671,8 +739,8 @@ function render() {
       : "";
     const friendTag = friendTagFor(m.title);
     return `<div class="card">
-      <div class="title" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
-      <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
+      <div class="title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
+      <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" · Mother":""}${m.barcode?" · Barcode: "+m.barcode:""}${m.discType?" · "+m.discType:""}${m.edition?" · Ed: "+m.edition:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
       <div class="flags">
         <span class="flag own">Owned</span>
         ${pkgNote}
@@ -718,6 +786,7 @@ function render() {
       const id = idLine ? idLine.dataset.copy : "";
       const title = el.textContent.trim();
       if (id) showLastId(id, title);
+      openEdit(el.dataset.id);
     };
   });
   document.querySelectorAll("button[data-copy]").forEach(btn => {
@@ -731,10 +800,61 @@ function render() {
   });
 }
 
+function openEdit(id) {
+  const m = getById(id);
+  if (!m) return;
+  $("editTitle").textContent = m.title;
+  $("editSource").value = m.source || "";
+  $("editEan").value = m.ean || m.barcode || "";
+  $("editImdbId").value = m.imdbId || "";
+  $("editDiscType").value = m.discType || "";
+  $("editAudioFormat").value = m.audioFormat || "";
+  $("editAudioChannels").value = m.audioChannels || "";
+  $("editEdition").value = m.edition || "";
+  $("editRelease").value = m.release || m.year || "";
+  $("editLanguages").value = m.languages || "";
+  $("editSubtitles").value = m.subtitles || "";
+  $("editRuntime").value = m.runtime || "";
+  $("editGenres").value = m.genres || "";
+  $("editDirector").value = m.director || "";
+  $("editComposer").value = m.composer || "";
+  $("editCinematographer").value = m.cinematographer || "";
+  $("editNotes").value = m.notes || "";
+  $("editPanel").dataset.id = id;
+  $("editPanel").classList.add("show");
+}
+$("editSave").onclick = () => {
+  const id = $("editPanel").dataset.id;
+  const m = getById(id);
+  if (!m) { $("editPanel").classList.remove("show"); return; }
+  m.source = ($("editSource").value || "").trim();
+  m.ean = ($("editEan").value || "").trim();
+  if (m.ean && !m.barcode) m.barcode = m.ean;
+  m.imdbId = ($("editImdbId").value || "").trim();
+  m.discType = ($("editDiscType").value || "").trim();
+  m.audioFormat = ($("editAudioFormat").value || "").trim();
+  m.audioChannels = ($("editAudioChannels").value || "").trim();
+  m.edition = ($("editEdition").value || "").trim();
+  m.release = ($("editRelease").value || "").trim();
+  m.languages = ($("editLanguages").value || "").trim();
+  m.subtitles = ($("editSubtitles").value || "").trim();
+  m.runtime = ($("editRuntime").value || "").trim();
+  m.genres = ($("editGenres").value || "").trim();
+  m.director = ($("editDirector").value || "").trim();
+  m.composer = ($("editComposer").value || "").trim();
+  m.cinematographer = ($("editCinematographer").value || "").trim();
+  m.notes = ($("editNotes").value || "").trim();
+  if (manualTitles.some(x => x.id === id)) saveManual();
+  else saveColl();
+  $("editPanel").classList.remove("show");
+  render();
+};
+$("editCancel").onclick = () => $("editPanel").classList.remove("show");
+
 $("motherTitle").oninput = () => omdbSuggest($("motherTitle").value, $("motherSuggest"));
 $("childTitle").oninput = () => omdbSuggest($("childTitle").value, $("childSuggest"));
 
-$("motherAddBtn").onclick = () => {
+$("motherAddBtn").onclick = async () => {
   const field = $("motherTitle");
   let t = (field.value || "").trim();
   if (!t && field.dataset.barcode) t = field.dataset.barcode;
@@ -743,8 +863,25 @@ $("motherAddBtn").onclick = () => {
   const m = makeMother(t, {
     barcode: field.dataset.barcode || "",
     imdbId: field.dataset.imdbId || "",
-    publicRating: field.dataset.publicRating || ""
+    publicRating: field.dataset.publicRating || "",
+    rawTitle: field.dataset.rawTitle || t,
+    discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t)
   });
+  // Auto-fill from OMDB when we have a title
+  try {
+    const r = await refineWithOMDB(field.dataset.rawTitle || t);
+    if (r.refined) {
+      if (!m.imdbId && r.imdbId) m.imdbId = r.imdbId;
+      if (!m.publicRating && r.rating) m.publicRating = r.rating;
+      if (!m.release && r.release) m.release = r.release;
+      if (!m.runtime && r.runtime) m.runtime = r.runtime;
+      if (!m.genres && r.genres) m.genres = r.genres;
+      if (!m.director && r.director) m.director = r.director;
+      if (!m.languages && r.languages) m.languages = r.languages;
+      if (!m.source && r.source) m.source = r.source;
+      if (!m.discType && r.discType) m.discType = r.discType;
+    }
+  } catch(e) {}
   manualTitles.unshift(m);
   saveManual();
   // re-read to confirm persistence
