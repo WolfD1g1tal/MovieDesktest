@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.004</title>
+<title>Movie Desk 0.6.005</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.004</h1>
+  <h1>Movie Desk 0.6.005</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -132,7 +132,8 @@
 
 <script>
 const OMDB_KEY = "8d83ba51";
-const UPCDATABASE_KEY = ""; // paste your free key from upcdatabase.org here (optional)
+const UPCMDB_KEY = "d207a24928dc0f20f056afe5cb887437";
+const UPCDATABASE_KEY = "7451A8510DEE05A60529AAE24745905D";
 const $ = id => document.getElementById(id);
 let collection = JSON.parse(localStorage.getItem("md_coll") || "[]");
 let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
@@ -430,21 +431,29 @@ async function lookupBarcode(code) {
   // Always try all sources on the primary barcode
   const c = candidates[0];
 
-  // 1st: GTINHub via CORS proxy
-  const gtin = await trySource("GTINHub",
-    `https://proxy.cors.dev/https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
-    d => d.found && d.product && (d.product.name || d.product.title) || null);
-  results.push(gtin);
-  if (gtin.title) matches.push({ title: gtin.title, source: "GTINHub" });
+  // 1st: UPCMDB (movie-specific, 500/month)
+  try {
+    const res = await fetch(`https://us-central1-upcmdb-cbae5.cloudfunctions.net/api/v1/lookup/${encodeURIComponent(c)}`, {
+      headers: { "x-api-key": UPCMDB_KEY }
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const title = d.title || (d.data && d.data.title);
+      results.push({ name: "UPCMDB", ok: !!title, title: title || null, data: d });
+      if (title) {
+        matches.push({ title, source: "UPCMDB", imdbId: d.imdbID || (d.data && d.data.imdbID) || "" });
+        // good hit — skip the rest
+      }
+    } else {
+      results.push({ name: "UPCMDB", ok: false, title: null, data: null });
+    }
+  } catch (e) {
+    results.push({ name: "UPCMDB", ok: false, title: null, data: null });
+  }
 
-  // 2nd: UPCitemdb via proxy
-  const upc = await trySource("UPCitemdb-proxy",
-    `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
-    d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
-  results.push(upc);
-  if (upc.title) matches.push({ title: upc.title, source: "UPCitemdb-proxy" });
-
-  // 4th: UPCDatabase.org (requires free API key — leave UPCDATABASE_KEY blank to skip)
+  // Only fall through if UPCMDB missed
+  if (!matches.length) {
+  // 2nd: UPCDatabase.org
   if (UPCDATABASE_KEY) {
     const upcdb = await trySource("UPCDatabase",
       `https://proxy.cors.dev/https://api.upcdatabase.org/product/${encodeURIComponent(c)}?apikey=${UPCDATABASE_KEY}`,
@@ -453,7 +462,21 @@ async function lookupBarcode(code) {
     if (upcdb.title) matches.push({ title: upcdb.title, source: "UPCDatabase" });
   }
 
-  // Alternate candidates on proxy only if nothing found
+  // 3rd: GTINHub via CORS proxy
+  const gtin = await trySource("GTINHub",
+    `https://proxy.cors.dev/https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
+    d => d.found && d.product && (d.product.name || d.product.title) || null);
+  results.push(gtin);
+  if (gtin.title) matches.push({ title: gtin.title, source: "GTINHub" });
+
+  // 4th: UPCitemdb via proxy
+  const upc = await trySource("UPCitemdb-proxy",
+    `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
+    d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
+  results.push(upc);
+  if (upc.title) matches.push({ title: upc.title, source: "UPCitemdb-proxy" });
+
+  // UPCDatabase moved to 2nd
   if (!matches.length && candidates.length > 1) {
     for (const alt of candidates.slice(1)) {
       const altUpc = await trySource("UPCitemdb-proxy-alt",
@@ -466,6 +489,7 @@ async function lookupBarcode(code) {
       }
     }
   }
+  } // end UPCMDB fallback
 
   const status = $("barcodeStatus");
   if (status) {
