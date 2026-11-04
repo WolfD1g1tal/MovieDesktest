@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.009</title>
+<title>Movie Desk 0.6.010</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.009</h1>
+  <h1>Movie Desk 0.6.010</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -62,7 +62,7 @@
   <div class="section-label">Add Mother (package / single title)</div>
   <div class="add-wrap">
     <div class="add-row">
-      <input type="text" id="motherTitle" placeholder="Mother title or barcodeâ€¦" autocomplete="off">
+      <input type="text" id="motherTitle" placeholder="Mother title or barcode..." autocomplete="off">
       <button id="motherAddBtn">Add Mother</button>
       <button id="motherScanBtn">Scan</button>
     </div>
@@ -71,12 +71,12 @@
 
   <div class="section-label">Add Child to Mother</div>
   <div id="lastIdBar" style="font-size:0.8rem;color:#aaa;margin:2px 0 8px;display:flex;align-items:center;gap:8px;">
-    <span id="lastIdText">Last ID: â€”</span>
+    <span id="lastIdText">Last ID: -</span>
     <button id="lastIdCopy" style="height:22px;padding:0 8px;font-size:0.7rem;background:#333;border:1px solid #555;color:#fff;">Copy</button>
   </div>
   <div class="add-wrap">
     <div class="add-row">
-      <input type="text" id="childTitle" placeholder="Child title or barcodeâ€¦" autocomplete="off">
+      <input type="text" id="childTitle" placeholder="Child title or barcode..." autocomplete="off">
       <input type="text" id="motherIdInput" placeholder="Mother ID" style="max-width:140px">
       <button id="childAddBtn">Add Child</button>
       <button id="childScanBtn">Scan</button>
@@ -109,7 +109,7 @@
   <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
   <div class="buy-wrap">
     <div class="buy-row">
-      <input type="text" id="buyQuery" placeholder="Search to buyâ€¦" autocomplete="off">
+      <input type="text" id="buyQuery" placeholder="Search to buy..." autocomplete="off">
       <button id="buyBtn">Search</button>
     </div>
     <div class="buy-results" id="buyResults"></div>
@@ -117,7 +117,7 @@
 
   <div id="barcodeStatus" style="display:none; font-size:0.75rem; color:#aaa; margin:6px 0 10px; padding:8px; background:#161616; border-radius:8px; border:1px solid #2a2a2a;"></div>
   <div id="scanner"><video id="video" autoplay playsinline></video></div>
-  <input type="search" id="q" placeholder="Search your titlesâ€¦">
+  <input type="search" id="q" placeholder="Search your titles...">
   <div id="out"></div>
 </main>
 
@@ -146,6 +146,8 @@
     </div>
   </div>
 </div>
+
+<div class="modal" id="modal">
   <div class="modal-box">
     <p id="modalMsg"></p>
     <label><input type="checkbox" id="modalDisable"> Disable</label>
@@ -231,7 +233,7 @@ async function loadRatingsFromDb() {
   try {
     myRatings = await idbGetAll("ratings");
     const n = Object.keys(myRatings).length;
-    if (n && $("counts")) $("counts").textContent = (getAll ? getAll().length : 0) + " titles Â· " + n + " ratings indexed";
+    if (n && $("counts")) $("counts").textContent = (getAll ? getAll().length : 0) + " titles | " + n + " ratings indexed";
   } catch(e) {}
 }
 function parseCsvLine(line) {
@@ -290,7 +292,7 @@ let lastAddedId = "";
 function showLastId(id, title){
   lastAddedId = id || "";
   const txt = $("lastIdText");
-  if (txt) txt.textContent = id ? ("Last ID: " + id + (title ? " Â· " + title : "")) : "Last ID: â€”";
+  if (txt) txt.textContent = id ? ("Last ID: " + id + (title ? " | " + title : "")) : "Last ID: -";
   const btn = $("lastIdCopy");
   if (btn) btn.dataset.copy = id || "";
 }
@@ -338,15 +340,19 @@ $("lastIdCopy").onclick = () => {
 function showPopup(msg){
   if (sessionStorage.getItem("md_popup_off") === "1") return;
   if (localStorage.getItem("md_popup_off") === "1") return;
-  $("modalMsg").textContent = msg;
-  $("modal").classList.add("show");
+  const modal = $("modal");
+  if (!modal) return;
+  const msgEl = $("modalMsg");
+  if (msgEl) msgEl.textContent = msg;
+  modal.classList.add("show");
 }
 $("modalOk").onclick = () => {
-  if ($("modalDisable").checked) localStorage.setItem("md_popup_off","1");
-  if ($("modalSession").checked) sessionStorage.setItem("md_popup_off","1");
-  $("modal").classList.remove("show");
-  $("modalDisable").checked = false;
-  $("modalSession").checked = false;
+  const modal = $("modal");
+  if ($("modalDisable") && $("modalDisable").checked) localStorage.setItem("md_popup_off","1");
+  if ($("modalSession") && $("modalSession").checked) sessionStorage.setItem("md_popup_off","1");
+  if (modal) modal.classList.remove("show");
+  if ($("modalDisable")) $("modalDisable").checked = false;
+  if ($("modalSession")) $("modalSession").checked = false;
 };
 
 function getAll(){ return [...collection, ...manualTitles]; }
@@ -369,7 +375,7 @@ function makeId(){
 function detectDiscType(raw) {
   if (!raw) return "";
   const s = String(raw);
-  if (/ultra\s*hd|\buhd\b|\b4k\b/i.test(s)) return "Ultra HD";
+  if (/ultra\s*hd|\buhd\b|\b4k\s*ultra\b|\b4k\b/i.test(s)) return "Ultra HD";
   if (/blu[- ]?ray|\bblu\b|\bbd\b/i.test(s)) return "Blu-ray";
   if (/\bdvd\b/i.test(s)) return "DVD";
   return "";
@@ -441,7 +447,7 @@ function cleanTitle(raw) {
   t = t.replace(/^(Warner\s+Brothers|Warner\s+Bros\.?|Universal|Paramount|Sony|Columbia|Disney|MGM|20th\s+Century(\s+Fox)?|Lionsgate|Lions\s*Gate|New\s+Line|DreamWorks|Fox|Miramax|Orion|Touchstone|Hollywood\s+Pictures)\s+/i, "");
   // Strip common physical media suffixes and studio noise
   t = t.replace(/\s*[\(\[]?\s*(Blu[- ]?ray|BluRay|BD|DVD|4K|UHD|Ultra\s*HD|Digital|Combo|Disc|Edition|Special|Collector|Steelbook|Slipcover).*[\)\]]?/gi, "");
-  t = t.replace(/\s*[-â€“â€”]\s*(Blu[- ]?ray|DVD|4K).*$/gi, "");
+  t = t.replace(/\s*[---]\s*(Blu[- ]?ray|DVD|4K).*$/gi, "");
   t = t.replace(/\s*\d+\s*Disc(s)?\b/gi, "");
   t = t.replace(/\s*\([^)]*\)\s*$/g, ""); // trailing paren groups
   t = t.replace(/\s+/g, " ").trim();
@@ -510,7 +516,7 @@ async function lookupBarcode(code) {
       results.push({ name: "UPCMDB", ok: !!title, title: title || null, data: d });
       if (title) {
         matches.push({ title, source: "UPCMDB", imdbId: d.imdbID || (d.data && d.data.imdbID) || "" });
-        // good hit â€” skip the rest
+        // good hit - skip the rest
       }
     } else {
       results.push({ name: "UPCMDB", ok: false, title: null, data: null });
@@ -562,7 +568,7 @@ async function lookupBarcode(code) {
   const status = $("barcodeStatus");
   if (status) {
     status.style.display = "block";
-    const lines = results.map(r => (r.ok ? "OK" : "FAIL") + " â€” " + r.name).join("<br>");
+    const lines = results.map(r => (r.ok ? "OK" : "FAIL") + " - " + r.name).join("<br>");
     status.innerHTML = "<b>Barcode lookup:</b><br>" + lines +
       (matches.length ? "<br><b>Matches found:</b> " + matches.length : "");
   }
@@ -598,9 +604,9 @@ async function startScan(target) {
   if (scanning) { stopScan(); return; }
   const status = $("barcodeStatus");
   status.style.display = "block";
-  status.innerHTML = "Starting cameraâ€¦";
+  status.innerHTML = "Starting camera...";
   if (!window.BarcodeDetector) {
-    status.innerHTML = "Loading iPhone scannerâ€¦";
+    status.innerHTML = "Loading iPhone scanner...";
     const ok = await ensureBarcodeDetector();
     if (!ok) { showPopup("Barcode scanning not available in this browser."); return; }
   }
@@ -615,14 +621,14 @@ async function startScan(target) {
     const detector = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
 
     // Wait until the video has frames
-    status.innerHTML = "Focusing â€” hold steadyâ€¦";
+    status.innerHTML = "Focusing - hold steady...";
     let readyTries = 0;
     while (video.readyState < 2 && readyTries < 30 && scanning) {
       await new Promise(r => setTimeout(r, 100));
       readyTries++;
     }
     if (!scanning) return;
-    status.innerHTML = "Ready â€” hold the barcode in frame";
+    status.innerHTML = "Ready - hold the barcode in frame";
 
     let stable = null;
     let stableCount = 0;
@@ -638,21 +644,21 @@ async function startScan(target) {
           status.innerHTML = "Saw: " + raw + " (" + stableCount + "/20)";
           if (stableCount >= 20) {
             const rawFinal = raw;
-            status.innerHTML = "Locked â€” " + rawFinal + "â€¦";
+            status.innerHTML = "Locked - " + rawFinal + "...";
             // short deliberate pause so the lock is visible
             await new Promise(r => setTimeout(r, 600));
             if (!scanning) return;
             stopScan();
-            status.innerHTML = "Looking up " + rawFinal + "â€¦";
+            status.innerHTML = "Looking up " + rawFinal + "...";
             const result = await lookupBarcode(rawFinal);
             const field = target === "mother" ? $("motherTitle") : $("childTitle");
             const box = target === "mother" ? $("motherSuggest") : $("childSuggest");
             field.dataset.barcode = result ? result.barcode : rawFinal;
-            const matches = (result && result.matches) || [];
-            field.dataset.rawTitle = (matches[0] && matches[0].title) || rawFinal;
+            const hits = (result && result.matches) || [];
+            field.dataset.rawTitle = (hits[0] && hits[0].title) || rawFinal;
             field.dataset.discType = detectDiscType(field.dataset.rawTitle);
-            if (matches.length) {
-              box.innerHTML = matches.map(m => {
+            if (hits.length) {
+              box.innerHTML = hits.map(m => {
                 const safe = (m.title || "").replace(/"/g, "&quot;");
                 return `<div data-title="${safe}" data-source="${m.source}">${m.title} <span style="color:#888;font-size:0.75rem">(${m.source})</span></div>`;
               }).join("");
@@ -666,22 +672,22 @@ async function startScan(target) {
                   showPopup("Selected: " + el.dataset.title);
                 };
               });
-              field.value = matches[0].title;
-              showPopup(matches.length + " match" + (matches.length>1?"es":"") + " â€” pick one from the list.");
+              field.value = hits[0].title;
+              showPopup(hits.length + " match" + (hits.length>1?"es":"") + " - pick one from the list.");
             } else {
               field.value = rawFinal;
               box.classList.remove("show");
-              showPopup("Scanned " + rawFinal + " â€” no title match.");
+              showPopup("Scanned " + rawFinal + " - no title match.");
             }
             return;
           }
         } else {
           stable = null;
           stableCount = 0;
-          status.innerHTML = "Lookingâ€¦ hold the barcode steady";
+          status.innerHTML = "Looking... hold the barcode steady";
         }
       } catch (e) {
-        status.innerHTML = "Detect error: " + (e.message || e);
+        status.innerHTML = "Detect error (0.6.010): " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
@@ -734,18 +740,18 @@ function render() {
     const boutNote = bout ? `<span class="flag" style="background:#5a3a00;color:#ffd580" data-boutique="${m.id}">Boutique: ${bout}</span>` : `<span class="flag" style="background:#333;color:#aaa" data-boutique="${m.id}">+ Boutique</span>`;
     const pkgNote = m.fromPackage ? `<span class="flag pkg" data-mother-id="${m.motherId||""}" style="cursor:pointer">From mother</span>` : "";
     const childHtml = (m.isMother && m.children && m.children.length)
-      ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " Â· " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
+      ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " | " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
       : "";
     const friendTag = friendTagFor(m.title);
     return `<div class="card">
       <div class="title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
-      <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" Â· Mother":""}${m.barcode?" Â· Barcode: "+m.barcode:""}${m.discType?" Â· "+m.discType:""}${m.edition?" Â· Ed: "+m.edition:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
+      <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" | Mother":""}${m.barcode?" | Barcode: "+m.barcode:""}${m.discType?" | "+m.discType:""}${m.edition?" | Ed: "+m.edition:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
       <div class="flags">
         <span class="flag own">Owned</span>
         ${pkgNote}
         ${boutNote}
         <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
-        <span class="flag imdb">IMDb: ${m.publicRating||"â€”"}</span>
+        <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
         ${myRatings[norm(m.title)] ? `<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ${myRatings[norm(m.title)]}</span>` : ""}
       </div>
       ${childHtml}
@@ -948,7 +954,7 @@ function friendTagFor(title) {
   const rating = friendRatings[n];
   if (!inInv && !rating) return "";
   const name = ($("friendName") && $("friendName").value.trim()) || "Friend";
-  const r = rating ? " Â· " + rating : "";
+  const r = rating ? " | " + rating : "";
   return ` <span class="flag" style="background:#2a1a3a;color:#d0a0e0;margin-left:6px;">${name}${r}</span>`;
 }
 
@@ -968,11 +974,11 @@ function showSettings() {
   const rows = stores.map(s => {
     const n = Array.isArray(s.data) ? s.data.length : Object.keys(s.data || {}).length;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;">
-      <div>${s.label}<br><span style="color:#888;font-size:0.75rem">${s.key} Â· ${n} items</span></div>
+      <div>${s.label}<br><span style="color:#888;font-size:0.75rem">${s.key} | ${n} items</span></div>
       <button data-clear="${s.key}" style="height:28px;padding:0 10px;font-size:0.75rem;background:#3a1a1a;color:#f88;">Clear</button>
     </div>`;
   }).join("");
-  box.innerHTML = `<b>Settings â€” stored in this browser</b>
+  box.innerHTML = `<b>Settings - stored in this browser</b>
     <div style="color:#888;font-size:0.8rem;margin:6px 0 10px;">Nothing is saved to a folder until you tap Export Library. Exported CSVs go to your phone/browser Downloads folder.</div>
     ${rows}`;
   box.querySelectorAll("[data-clear]").forEach(btn => {
@@ -1007,7 +1013,7 @@ function showSection(name) {
     const lines = mine.slice(0,60).map(m => {
       const fr = friendRatings[normTitle(m.title)];
       const name = ($("friendName") && $("friendName").value.trim()) || "Friend";
-      return `<div>${m.title} Â· IMDb: ${m.publicRating||"â€”"}${fr ? " Â· " + name + ": " + fr : ""}</div>`;
+      return `<div>${m.title} | IMDb: ${m.publicRating||"-"}${fr ? " | " + name + ": " + fr : ""}</div>`;
     }).join("") || "<div style='color:#777'>No rated titles yet.</div>";
     box.innerHTML = "<b>Rated</b><br>" + lines;
     return;
