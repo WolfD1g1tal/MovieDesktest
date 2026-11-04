@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.005</title>
+<title>Movie Desk 0.6.006</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.005</h1>
+  <h1>Movie Desk 0.6.006</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -378,6 +378,8 @@ function makeChild(title, motherId, extra={}){
 function cleanTitle(raw) {
   if (!raw) return "";
   let t = raw;
+  // Strip common studio prefixes (Warner Brothers, Universal, etc.)
+  t = t.replace(/^(Warner\s+Brothers|Warner\s+Bros\.?|Universal|Paramount|Sony|Columbia|Disney|MGM|20th\s+Century(\s+Fox)?|Lionsgate|Lions\s*Gate|New\s+Line|DreamWorks|Fox|Miramax|Orion|Touchstone|Hollywood\s+Pictures)\s+/i, "");
   // Strip common physical media suffixes and studio noise
   t = t.replace(/\s*[\(\[]?\s*(Blu[- ]?ray|BluRay|BD|DVD|4K|UHD|Ultra\s*HD|Digital|Combo|Disc|Edition|Special|Collector|Steelbook|Slipcover).*[\)\]]?/gi, "");
   t = t.replace(/\s*[-–—]\s*(Blu[- ]?ray|DVD|4K).*$/gi, "");
