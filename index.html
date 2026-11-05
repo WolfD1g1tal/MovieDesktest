@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.013</title>
+<title>Movie Desk 0.6.014</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.013</h1>
+  <h1>Movie Desk 0.6.014</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -318,9 +318,9 @@ function loadBoutiqueCsv() {
       const idx = name => header.findIndex(h => h === name || h.replace(/[^a-z]/g, "") === name.replace(/[^a-z]/g, ""));
       const bIdx = ["barcode","upc","ean","gtin"].map(idx).find(i => i >= 0);
       const tIdx = idx("title");
-      const eIdx = idx("edition");
+      const eIdx = ["edition","format"].map(idx).find(i => i >= 0);
       const lIdx = ["label","boutique","studio"].map(idx).find(i => i >= 0);
-      const cIdx = ["coverurl","cover","cover_url","image"].map(idx).find(i => i >= 0);
+      const cIdx = ["coverurl","cover","cover_url","image","source_url","sourceurl"].map(idx).find(i => i >= 0);
       if (bIdx == null || bIdx < 0) { showPopup("Need a barcode / upc / ean column."); return; }
       const map = {};
       for (let i = 1; i < lines.length; i++) {
@@ -759,7 +759,7 @@ async function startScan(target) {
           status.innerHTML = "Looking... hold the barcode steady (auto)";
         }
       } catch (e) {
-        status.innerHTML = "Detect error (0.6.013): " + (e.message || e);
+        status.innerHTML = "Detect error (0.6.014): " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
@@ -939,20 +939,24 @@ $("motherAddBtn").onclick = async () => {
   let t = (field.value || "").trim();
   if (!t && field.dataset.barcode) t = field.dataset.barcode;
   if (!t) { showPopup("Nothing to add."); return; }
+  // If the user typed a barcode, use it for the catalog lookup
+  const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
+  const barcode = field.dataset.barcode || typedBarcode;
   // Ensure we always have a usable title string even if lookup was partial
   const m = makeMother(t, {
-    barcode: field.dataset.barcode || "",
+    barcode: barcode,
     imdbId: field.dataset.imdbId || "",
     publicRating: field.dataset.publicRating || "",
     rawTitle: field.dataset.rawTitle || t,
     discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t)
   });
   // Auto-fill from boutique catalog if barcode matches
-  const boutHit = lookupBoutique(m.barcode);
+  const boutHit = lookupBoutique(barcode);
   if (boutHit) {
     if (!m.boutiqueLabel && boutHit.label) m.boutiqueLabel = boutHit.label;
     if (!m.edition && boutHit.edition) m.edition = boutHit.edition;
     if (!m.coverUrl && boutHit.coverUrl) m.coverUrl = boutHit.coverUrl;
+    if (boutHit.title && /^\d+$/.test(m.title)) m.title = boutHit.title;
     if (boutHit.label) { boutiqueFlags[m.id] = boutHit.label; saveBoutique(); }
   }
   // Auto-fill from OMDB when we have a title
@@ -991,12 +995,15 @@ $("childAddBtn").onclick = () => {
   if (!t || !mid) { showPopup("Need child title and mother ID."); return; }
   const mother = getById(mid);
   if (!mother || !mother.isMother) { showPopup("Mother ID not found."); return; }
-  const c = makeChild(t, mid, { barcode: $("childTitle").dataset.barcode || mother.barcode || "", imdbId: $("childTitle").dataset.imdbId || "", publicRating: $("childTitle").dataset.publicRating || "" });
-  const boutHit = lookupBoutique(c.barcode);
+  const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
+  const barcode = $("childTitle").dataset.barcode || typedBarcode || mother.barcode || "";
+  const c = makeChild(t, mid, { barcode: barcode, imdbId: $("childTitle").dataset.imdbId || "", publicRating: $("childTitle").dataset.publicRating || "" });
+  const boutHit = lookupBoutique(barcode);
   if (boutHit) {
     if (!c.boutiqueLabel && boutHit.label) c.boutiqueLabel = boutHit.label;
     if (!c.edition && boutHit.edition) c.edition = boutHit.edition;
     if (!c.coverUrl && boutHit.coverUrl) c.coverUrl = boutHit.coverUrl;
+    if (boutHit.title && /^\d+$/.test(c.title)) c.title = boutHit.title;
     if (boutHit.label) { boutiqueFlags[c.id] = boutHit.label; saveBoutique(); }
   }
   manualTitles.push(c);
