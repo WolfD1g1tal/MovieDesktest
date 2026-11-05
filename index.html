@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.015</title>
+<title>Movie Desk 0.6.016</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.015</h1>
+  <h1>Movie Desk 0.6.016</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -349,6 +349,7 @@ let scanTarget = null; // "mother" or "child"
 function saveColl(){ localStorage.setItem("md_coll", JSON.stringify(collection)); }
 function saveManual(){ localStorage.setItem("md_manual", JSON.stringify(manualTitles)); }
 function saveHomo(){ localStorage.setItem("md_homo", JSON.stringify(homoFlags)); }
+function saveBoutique(){ localStorage.setItem("md_boutique", JSON.stringify(boutiqueFlags)); }
 function norm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
 let lastAddedId = "";
 function showLastId(id, title){
@@ -759,7 +760,7 @@ async function startScan(target) {
           status.innerHTML = "Looking... hold the barcode steady (auto)";
         }
       } catch (e) {
-        status.innerHTML = "Detect error (0.6.015): " + (e.message || e);
+        status.innerHTML = "Detect error (0.6.016): " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
