@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.010</title>
+<title>Movie Desk 0.6.012</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,13 +48,14 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.010</h1>
+  <h1>Movie Desk 0.6.012</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
   <div>
     <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
     <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
+    <label class="load">Load Boutique Catalog<input type="file" id="fboutique" accept=".csv"></label>
     <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
     <button id="exportBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;border-radius:6px;">Export Library</button>
   </div>
@@ -139,6 +140,7 @@
     <label style="display:block;margin:6px 0">Director<br><input type="text" id="editDirector" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Composer<br><input type="text" id="editComposer" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Cinematographer<br><input type="text" id="editCinematographer" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Cover URL<br><input type="text" id="editCoverUrl" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Notes<br><input type="text" id="editNotes" style="width:100%;height:36px"></label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="editSave">Save</button>
@@ -185,10 +187,11 @@ let dbPromise = null;
 function openDb() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open("MovieDesk", 1);
+    const req = indexedDB.open("MovieDesk", 2);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains("ratings")) db.createObjectStore("ratings");
+      if (!db.objectStoreNames.contains("boutique")) db.createObjectStore("boutique");
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -280,6 +283,57 @@ function loadMyRatings() {
 }
 loadMyRatings();
 loadRatingsFromDb();
+let boutiqueCatalog = {};
+async function loadBoutiqueCatalog() {
+  try {
+    boutiqueCatalog = await idbGetAll("boutique");
+  } catch(e) {}
+}
+loadBoutiqueCatalog();
+function lookupBoutique(barcode) {
+  if (!barcode) return null;
+  const clean = String(barcode).replace(/\D/g, "");
+  if (!clean) return null;
+  return boutiqueCatalog[clean] || boutiqueCatalog[barcode] || null;
+}
+function loadBoutiqueCsv() {
+  const el = $("fboutique");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const lines = (reader.result || "").split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) { showPopup("Empty file."); return; }
+      const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      const idx = name => header.findIndex(h => h === name || h.replace(/[^a-z]/g, "") === name.replace(/[^a-z]/g, ""));
+      const bIdx = ["barcode","upc","ean","gtin"].map(idx).find(i => i >= 0);
+      const tIdx = idx("title");
+      const eIdx = idx("edition");
+      const lIdx = ["label","boutique","studio"].map(idx).find(i => i >= 0);
+      const cIdx = ["coverurl","cover","cover_url","image"].map(idx).find(i => i >= 0);
+      if (bIdx == null || bIdx < 0) { showPopup("Need a barcode / upc / ean column."); return; }
+      const map = {};
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const bc = (cols[bIdx] || "").replace(/\D/g, "");
+        if (!bc) continue;
+        map[bc] = {
+          title: (tIdx >= 0 ? cols[tIdx] : "") || "",
+          edition: (eIdx >= 0 ? cols[eIdx] : "") || "",
+          label: (lIdx >= 0 ? cols[lIdx] : "") || "",
+          coverUrl: (cIdx >= 0 ? cols[cIdx] : "") || ""
+        };
+      }
+      boutiqueCatalog = map;
+      await idbPutMap("boutique", boutiqueCatalog);
+      showPopup("Boutique catalog indexed: " + Object.keys(map).length);
+    };
+    reader.readAsText(file);
+  };
+}
+loadBoutiqueCsv();
 let scanning = false;
 let stream = null;
 let scanTarget = null; // "mother" or "child"
@@ -396,6 +450,7 @@ function makeMother(title, extra={}){
     edition: extra.edition || "",
     notes: extra.notes || "",
     boutiqueLabel: extra.boutiqueLabel || "",
+    coverUrl: extra.coverUrl || "",
     source: extra.source || "",
     ean: extra.ean || extra.barcode || "",
     discType: extra.discType || detectDiscType(extra.rawTitle || title),
@@ -424,6 +479,7 @@ function makeChild(title, motherId, extra={}){
     edition: extra.edition || "",
     notes: extra.notes || "",
     boutiqueLabel: extra.boutiqueLabel || "",
+    coverUrl: extra.coverUrl || "",
     source: extra.source || "",
     ean: extra.ean || extra.barcode || "",
     discType: extra.discType || detectDiscType(extra.rawTitle || title),
@@ -628,21 +684,29 @@ async function startScan(target) {
       readyTries++;
     }
     if (!scanning) return;
-    status.innerHTML = "Ready - hold the barcode in frame";
+    status.innerHTML = "Ready - hold the barcode in frame (auto)";
+
+    // Canvas path: more reliable on iPhone Safari than detect(video)
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
 
     let stable = null;
     let stableCount = 0;
     const loop = async () => {
       if (!scanning) return;
       try {
-        const codes = await detector.detect(video);
+        if (video.videoWidth && video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+        const codes = await detector.detect(canvas);
         if (codes.length) {
           const raw = codes[0].rawValue;
-          status.innerHTML = "Saw: " + raw + " (" + stableCount + ")";
           if (raw === stable) stableCount++;
           else { stable = raw; stableCount = 1; }
-          status.innerHTML = "Saw: " + raw + " (" + stableCount + "/20)";
-          if (stableCount >= 20) {
+          status.innerHTML = "Saw: " + raw + " (" + stableCount + "/8) - hold steady";
+          if (stableCount >= 8) {
             const rawFinal = raw;
             status.innerHTML = "Locked - " + rawFinal + "...";
             // short deliberate pause so the lock is visible
@@ -684,10 +748,10 @@ async function startScan(target) {
         } else {
           stable = null;
           stableCount = 0;
-          status.innerHTML = "Looking... hold the barcode steady";
+          status.innerHTML = "Looking... hold the barcode steady (auto)";
         }
       } catch (e) {
-        status.innerHTML = "Detect error (0.6.010): " + (e.message || e);
+        status.innerHTML = "Detect error (0.6.012): " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
@@ -744,6 +808,7 @@ function render() {
       : "";
     const friendTag = friendTagFor(m.title);
     return `<div class="card">
+      ${m.coverUrl ? `<img src="${m.coverUrl}" alt="" style="width:60px;height:90px;object-fit:cover;border-radius:4px;float:right;margin:0 0 6px 8px;background:#222">` : ""}
       <div class="title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
       <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" | Mother":""}${m.barcode?" | Barcode: "+m.barcode:""}${m.discType?" | "+m.discType:""}${m.edition?" | Ed: "+m.edition:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
       <div class="flags">
@@ -825,6 +890,7 @@ function openEdit(id) {
   $("editComposer").value = m.composer || "";
   $("editCinematographer").value = m.cinematographer || "";
   $("editNotes").value = m.notes || "";
+  $("editCoverUrl").value = m.coverUrl || "";
   $("editPanel").dataset.id = id;
   $("editPanel").classList.add("show");
 }
@@ -849,6 +915,7 @@ $("editSave").onclick = () => {
   m.composer = ($("editComposer").value || "").trim();
   m.cinematographer = ($("editCinematographer").value || "").trim();
   m.notes = ($("editNotes").value || "").trim();
+  m.coverUrl = ($("editCoverUrl").value || "").trim();
   if (manualTitles.some(x => x.id === id)) saveManual();
   else saveColl();
   $("editPanel").classList.remove("show");
@@ -872,6 +939,14 @@ $("motherAddBtn").onclick = async () => {
     rawTitle: field.dataset.rawTitle || t,
     discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t)
   });
+  // Auto-fill from boutique catalog if barcode matches
+  const boutHit = lookupBoutique(m.barcode);
+  if (boutHit) {
+    if (!m.boutiqueLabel && boutHit.label) m.boutiqueLabel = boutHit.label;
+    if (!m.edition && boutHit.edition) m.edition = boutHit.edition;
+    if (!m.coverUrl && boutHit.coverUrl) m.coverUrl = boutHit.coverUrl;
+    if (boutHit.label) { boutiqueFlags[m.id] = boutHit.label; saveBoutique(); }
+  }
   // Auto-fill from OMDB when we have a title
   try {
     const r = await refineWithOMDB(field.dataset.rawTitle || t);
@@ -909,6 +984,13 @@ $("childAddBtn").onclick = () => {
   const mother = getById(mid);
   if (!mother || !mother.isMother) { showPopup("Mother ID not found."); return; }
   const c = makeChild(t, mid, { barcode: $("childTitle").dataset.barcode || mother.barcode || "", imdbId: $("childTitle").dataset.imdbId || "", publicRating: $("childTitle").dataset.publicRating || "" });
+  const boutHit = lookupBoutique(c.barcode);
+  if (boutHit) {
+    if (!c.boutiqueLabel && boutHit.label) c.boutiqueLabel = boutHit.label;
+    if (!c.edition && boutHit.edition) c.edition = boutHit.edition;
+    if (!c.coverUrl && boutHit.coverUrl) c.coverUrl = boutHit.coverUrl;
+    if (boutHit.label) { boutiqueFlags[c.id] = boutHit.label; saveBoutique(); }
+  }
   manualTitles.push(c);
   mother.children = mother.children || [];
   mother.children.push(c.id);
@@ -968,7 +1050,8 @@ function showSettings() {
     { key: "md_my_watch", label: "Personal watchlist", data: myWatchlist },
     { key: "md_friend_watch", label: "Friend watchlist", data: friendWatchlist },
     { key: "md_homo", label: "Homosexual-scenes flags", data: homoFlags },
-    { key: "md_boutique", label: "Boutique labels", data: boutiqueFlags }
+    { key: "md_boutique", label: "Boutique labels", data: boutiqueFlags },
+    { key: "boutique-catalog", label: "Boutique catalog (barcode index)", data: boutiqueCatalog }
   ];
   const box = $("sectionOut");
   const rows = stores.map(s => {
@@ -995,6 +1078,7 @@ function showSettings() {
       if (key === "md_friend_watch") friendWatchlist = [];
       if (key === "md_homo") Object.keys(homoFlags).forEach(k => delete homoFlags[k]);
       if (key === "md_boutique") Object.keys(boutiqueFlags).forEach(k => delete boutiqueFlags[k]);
+      if (key === "boutique-catalog") { boutiqueCatalog = {}; idbClear("boutique"); }
       showPopup("Cleared " + key);
       showSettings();
       render();
