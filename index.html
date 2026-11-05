@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.014</title>
+<title>Movie Desk 0.6.015</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,7 +48,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.014</h1>
+  <h1>Movie Desk 0.6.015</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -759,7 +759,7 @@ async function startScan(target) {
           status.innerHTML = "Looking... hold the barcode steady (auto)";
         }
       } catch (e) {
-        status.innerHTML = "Detect error (0.6.014): " + (e.message || e);
+        status.innerHTML = "Detect error (0.6.015): " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
@@ -935,58 +935,57 @@ $("motherTitle").oninput = () => omdbSuggest($("motherTitle").value, $("motherSu
 $("childTitle").oninput = () => omdbSuggest($("childTitle").value, $("childSuggest"));
 
 $("motherAddBtn").onclick = async () => {
-  const field = $("motherTitle");
-  let t = (field.value || "").trim();
-  if (!t && field.dataset.barcode) t = field.dataset.barcode;
-  if (!t) { showPopup("Nothing to add."); return; }
-  // If the user typed a barcode, use it for the catalog lookup
-  const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
-  const barcode = field.dataset.barcode || typedBarcode;
-  // Ensure we always have a usable title string even if lookup was partial
-  const m = makeMother(t, {
-    barcode: barcode,
-    imdbId: field.dataset.imdbId || "",
-    publicRating: field.dataset.publicRating || "",
-    rawTitle: field.dataset.rawTitle || t,
-    discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t)
-  });
-  // Auto-fill from boutique catalog if barcode matches
-  const boutHit = lookupBoutique(barcode);
-  if (boutHit) {
-    if (!m.boutiqueLabel && boutHit.label) m.boutiqueLabel = boutHit.label;
-    if (!m.edition && boutHit.edition) m.edition = boutHit.edition;
-    if (!m.coverUrl && boutHit.coverUrl) m.coverUrl = boutHit.coverUrl;
-    if (boutHit.title && /^\d+$/.test(m.title)) m.title = boutHit.title;
-    if (boutHit.label) { boutiqueFlags[m.id] = boutHit.label; saveBoutique(); }
-  }
-  // Auto-fill from OMDB when we have a title
   try {
-    const r = await refineWithOMDB(field.dataset.rawTitle || t);
-    if (r.refined) {
-      if (!m.imdbId && r.imdbId) m.imdbId = r.imdbId;
-      if (!m.publicRating && r.rating) m.publicRating = r.rating;
-      if (!m.release && r.release) m.release = r.release;
-      if (!m.runtime && r.runtime) m.runtime = r.runtime;
-      if (!m.genres && r.genres) m.genres = r.genres;
-      if (!m.director && r.director) m.director = r.director;
-      if (!m.languages && r.languages) m.languages = r.languages;
-      if (!m.source && r.source) m.source = r.source;
-      if (!m.discType && r.discType) m.discType = r.discType;
+    const field = $("motherTitle");
+    let t = (field.value || "").trim();
+    if (!t && field.dataset.barcode) t = field.dataset.barcode;
+    if (!t) { showPopup("Nothing to add."); return; }
+    const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
+    const barcode = field.dataset.barcode || typedBarcode;
+    const m = makeMother(t, {
+      barcode: barcode,
+      imdbId: field.dataset.imdbId || "",
+      publicRating: field.dataset.publicRating || "",
+      rawTitle: field.dataset.rawTitle || t,
+      discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t)
+    });
+    const boutHit = lookupBoutique(barcode);
+    if (boutHit) {
+      if (!m.boutiqueLabel && boutHit.label) m.boutiqueLabel = boutHit.label;
+      if (!m.edition && boutHit.edition) m.edition = boutHit.edition;
+      if (!m.coverUrl && boutHit.coverUrl) m.coverUrl = boutHit.coverUrl;
+      if (boutHit.title && /^\d+$/.test(String(m.title || ""))) m.title = boutHit.title;
+      if (boutHit.label) { boutiqueFlags[m.id] = boutHit.label; saveBoutique(); }
     }
-  } catch(e) {}
-  manualTitles.unshift(m);
-  saveManual();
-  // re-read to confirm persistence
-  manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
-  field.value = "";
-  field.dataset.barcode = "";
-  field.dataset.imdbId = "";
-  field.dataset.publicRating = "";
-  $("motherSuggest").classList.remove("show");
-  showPopup("Added: " + m.title + " | ID: " + m.id + (boutHit ? " | Boutique: " + (boutHit.label || "matched") : "") + " | Total: " + getAll().length);
-  showLastId(m.id, m.title);
-  render();
-  if ($("counts")) $("counts").textContent = getAll().length + " shown / " + getAll().length + " total";
+    try {
+      const r = await refineWithOMDB(field.dataset.rawTitle || t);
+      if (r.refined) {
+        if (!m.imdbId && r.imdbId) m.imdbId = r.imdbId;
+        if (!m.publicRating && r.rating) m.publicRating = r.rating;
+        if (!m.release && r.release) m.release = r.release;
+        if (!m.runtime && r.runtime) m.runtime = r.runtime;
+        if (!m.genres && r.genres) m.genres = r.genres;
+        if (!m.director && r.director) m.director = r.director;
+        if (!m.languages && r.languages) m.languages = r.languages;
+        if (!m.source && r.source) m.source = r.source;
+        if (!m.discType && r.discType) m.discType = r.discType;
+      }
+    } catch(e) {}
+    manualTitles.unshift(m);
+    saveManual();
+    manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
+    field.value = "";
+    field.dataset.barcode = "";
+    field.dataset.imdbId = "";
+    field.dataset.publicRating = "";
+    $("motherSuggest").classList.remove("show");
+    showPopup("Added: " + m.title + " | ID: " + m.id + (boutHit ? " | Boutique: " + (boutHit.label || "matched") : " | no boutique match") + " | Total: " + getAll().length);
+    showLastId(m.id, m.title);
+    render();
+    if ($("counts")) $("counts").textContent = getAll().length + " shown / " + getAll().length + " total";
+  } catch(err) {
+    showPopup("Add failed: " + (err && err.message ? err.message : err));
+  }
 };
 
 $("childAddBtn").onclick = () => {
