@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.001</title>
+<title>Movie Desk 0.7.002</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -52,7 +52,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.001</h1>
+  <h1>Movie Desk 0.7.002</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -94,6 +94,7 @@
     <input type="text" id="friendName" placeholder="Friend first name" style="max-width:160px;margin:0;">
     <label class="load">Friend Inventory<input type="file" id="friendInv" accept=".csv,.txt"></label>
     <label class="load">Friend Ratings<input type="file" id="friendRatings" accept=".csv,.txt"></label>
+    <label class="load">Friend Watchlist<input type="file" id="friendWatchData" accept=".csv,.txt"></label>
   </div>
   <div class="section-label">Sections</div>
   <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
@@ -764,7 +765,7 @@ async function startScan(target) {
           status.innerHTML = "Looking... hold the barcode steady (auto)";
         }
       } catch (e) {
-        status.innerHTML = "Detect error (0.6.017): " + (e.message || e);
+        status.innerHTML = "Detect error: " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
@@ -787,7 +788,7 @@ function boutiqueSuggest(query, box) {
     if (row) hits.push({ barcode: bc, title: row.title || bc, label: row.label || "", edition: row.edition || "", coverUrl: row.coverUrl || "" });
   }
   if (!hits.length) return false;
-  box.innerHTML = hits.map(h => `<div data-barcode="${h.barcode}" data-title="${(h.title||"").replace(/"/g,""")}" data-label="${(h.label||"").replace(/"/g,""")}" data-edition="${(h.edition||"").replace(/"/g,""")}" data-cover="${(h.coverUrl||"").replace(/"/g,""")}">${h.title}${h.label ? " | " + h.label : ""}${h.edition ? " | " + h.edition : ""}<br><span style="color:#888;font-size:0.75rem">${h.barcode}</span></div>`).join("");
+  box.innerHTML = hits.map(h => `<div data-barcode="${h.barcode}" data-title="${(h.title||"").replace(/"/g,"&quot;")}" data-label="${(h.label||"").replace(/"/g,"&quot;")}" data-edition="${(h.edition||"").replace(/"/g,"&quot;")}" data-cover="${(h.coverUrl||"").replace(/"/g,"&quot;")}">${h.title}${h.label ? " | " + h.label : ""}${h.edition ? " | " + h.edition : ""}<br><span style="color:#888;font-size:0.75rem">${h.barcode}</span></div>`).join("");
   box.classList.add("show");
   box.querySelectorAll("div").forEach(el => {
     el.onclick = () => {
@@ -1058,8 +1059,8 @@ $("childAddBtn").onclick = () => {
   render();
 };
 
-$("motherScanBtn").onclick = () => startScan("mother");
-$("childScanBtn").onclick = () => startScan("child");
+$("motherScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; $("barcodeStatus").innerHTML = "Scan tapped"; startScan("mother"); };
+$("childScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; $("barcodeStatus").innerHTML = "Scan tapped"; startScan("child"); };
 
 $("buyBtn").onclick = async () => {
   const q = $("buyQuery").value.trim();
@@ -1230,6 +1231,7 @@ loadListFile("friendInv", arr => { friendInvTitles = arr; }, "md_friend_inv");
 loadRatingsFile();
 loadListFile("myWatch", arr => { myWatchlist = arr; }, "md_my_watch");
 loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch");
+loadListFile("friendWatchData", arr => { friendWatchlist = arr; }, "md_friend_watch");
 
 $("tabInventory").onclick = () => showSection("inventory");
 $("tabSettings").onclick = () => { currentSection = "settings"; $("watchControls").style.display = "none"; $("out").style.display = "none"; $("q").style.display = "none"; showSettings(); };
