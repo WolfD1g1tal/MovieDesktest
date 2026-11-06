@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.6.016</title>
+<title>Movie Desk 0.7.001</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -21,8 +21,12 @@
   .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
   #scanner { display: none; margin: 12px 0; }
   #scanner video { width: 100%; border-radius: 12px; background: #000; }
-  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 14px; margin-bottom: 10px; }
-  .title { font-weight: 500; cursor: pointer; }
+  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start; }
+  .card-cover { width: 60px; height: 90px; object-fit: cover; border-radius: 4px; background: #222; flex-shrink: 0; }
+  .card-body { flex: 1; min-width: 0; }
+  .card-title { font-weight: 500; font-size: 1rem; margin: 0 0 2px; cursor: pointer; }
+  .card-meta { color: #aaa; font-size: 0.8rem; margin: 2px 0 6px; }
+  .card-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .child-list { margin-top: 8px; margin-left: 24px; border-left: 2px solid #6a3a8a; padding-left: 10px; display: none; }
   .child-list.show { display: block; }
   .child-item { background: #2a1a3a; border: 1px solid #5a3a7a; border-radius: 6px; padding: 8px; margin: 4px 0; color: #d0a0e0; }
@@ -48,7 +52,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.6.016</h1>
+  <h1>Movie Desk 0.7.001</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -760,7 +764,7 @@ async function startScan(target) {
           status.innerHTML = "Looking... hold the barcode steady (auto)";
         }
       } catch (e) {
-        status.innerHTML = "Detect error (0.6.016): " + (e.message || e);
+        status.innerHTML = "Detect error (0.6.017): " + (e.message || e);
       }
       if (scanning) requestAnimationFrame(loop);
     };
@@ -771,7 +775,35 @@ async function startScan(target) {
   }
 }
 
+function boutiqueSuggest(query, box) {
+  const digits = (query || "").replace(/\D/g, "");
+  if (digits.length < 4) return false;
+  const hits = [];
+  const keys = Object.keys(boutiqueCatalog);
+  for (let i = 0; i < keys.length && hits.length < 8; i++) {
+    const bc = keys[i];
+    if (bc.indexOf(digits) === -1) continue;
+    const row = boutiqueCatalog[bc];
+    if (row) hits.push({ barcode: bc, title: row.title || bc, label: row.label || "", edition: row.edition || "", coverUrl: row.coverUrl || "" });
+  }
+  if (!hits.length) return false;
+  box.innerHTML = hits.map(h => `<div data-barcode="${h.barcode}" data-title="${(h.title||"").replace(/"/g,""")}" data-label="${(h.label||"").replace(/"/g,""")}" data-edition="${(h.edition||"").replace(/"/g,""")}" data-cover="${(h.coverUrl||"").replace(/"/g,""")}">${h.title}${h.label ? " | " + h.label : ""}${h.edition ? " | " + h.edition : ""}<br><span style="color:#888;font-size:0.75rem">${h.barcode}</span></div>`).join("");
+  box.classList.add("show");
+  box.querySelectorAll("div").forEach(el => {
+    el.onclick = () => {
+      const field = box.id === "motherSuggest" ? $("motherTitle") : $("childTitle");
+      field.value = el.dataset.title || el.dataset.barcode;
+      field.dataset.barcode = el.dataset.barcode || "";
+      field.dataset.boutiqueLabel = el.dataset.label || "";
+      field.dataset.edition = el.dataset.edition || "";
+      field.dataset.coverUrl = el.dataset.cover || "";
+      box.classList.remove("show");
+    };
+  });
+  return true;
+}
 async function omdbSuggest(query, box) {
+  if (boutiqueSuggest(query, box)) return;
   if (!query || query.length < 3) { box.classList.remove("show"); return; }
   try {
     const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=${OMDB_KEY}`);
@@ -816,19 +848,22 @@ function render() {
       ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " | " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
       : "";
     const friendTag = friendTagFor(m.title);
+    const cover = m.coverUrl ? `<img class="card-cover" src="${m.coverUrl}" alt="">` : `<div class="card-cover"></div>`;
     return `<div class="card">
-      ${m.coverUrl ? `<img src="${m.coverUrl}" alt="" style="width:60px;height:90px;object-fit:cover;border-radius:4px;float:right;margin:0 0 6px 8px;background:#222">` : ""}
-      <div class="title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
-      <div style="color:#aaa;font-size:0.85rem;margin:4px 0">ID: ${m.id||"missing"}${m.isMother?" | Mother":""}${m.barcode?" | Barcode: "+m.barcode:""}${m.discType?" | "+m.discType:""}${m.edition?" | Ed: "+m.edition:""} <button data-copy="${m.id||''}" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:6px;background:#333;border:1px solid #555;color:#fff;">Copy ID</button></div>
-      <div class="flags">
-        <span class="flag own">Owned</span>
-        ${pkgNote}
-        ${boutNote}
-        <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homosexual scenes: ${isYes?"yes":"no"}</span>
-        <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
-        ${myRatings[norm(m.title)] ? `<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ${myRatings[norm(m.title)]}</span>` : ""}
+      ${cover}
+      <div class="card-body">
+        <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
+        <div class="card-meta">${m.year || ""}${m.discType ? " | " + m.discType : ""}${m.edition ? " | " + m.edition : ""}</div>
+        <div class="card-flags">
+          <span class="flag own">Owned</span>
+          ${pkgNote}
+          ${boutNote}
+          <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homo: ${isYes?"yes":"no"}</span>
+          <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
+          ${myRatings[norm(m.title)] ? `<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ${myRatings[norm(m.title)]}</span>` : ""}
+        </div>
+        ${childHtml}
       </div>
-      ${childHtml}
     </div>`;
   }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
 
@@ -853,7 +888,7 @@ function render() {
       render();
     };
   });
-  document.querySelectorAll(".title[data-mother]").forEach(el => {
+  document.querySelectorAll(".card-title[data-mother]").forEach(el => {
     const mid = el.dataset.mother;
     el.onclick = () => {
       if (mid) {
@@ -861,8 +896,7 @@ function render() {
         if (list) list.classList.toggle("show");
       }
       const card = el.closest(".card");
-      const idLine = card && card.querySelector("button[data-copy]");
-      const id = idLine ? idLine.dataset.copy : "";
+      const id = el.dataset.id || "";
       const title = el.textContent.trim();
       if (id) showLastId(id, title);
       openEdit(el.dataset.id);
@@ -948,7 +982,10 @@ $("motherAddBtn").onclick = async () => {
       imdbId: field.dataset.imdbId || "",
       publicRating: field.dataset.publicRating || "",
       rawTitle: field.dataset.rawTitle || t,
-      discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t)
+      discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t),
+      boutiqueLabel: field.dataset.boutiqueLabel || "",
+      edition: field.dataset.edition || "",
+      coverUrl: field.dataset.coverUrl || ""
     });
     const boutHit = lookupBoutique(barcode);
     if (boutHit) {
