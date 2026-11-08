@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.002</title>
+<title>Movie Desk 0.7.004</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -37,6 +37,7 @@
   .imdb { background: #2a2a1a; color: #e0c07a; }
   .you { background: #0a2a2a; color: #00e5ff; }
   .pkg { background: #2a1a2a; color: #e0a07a; }
+  .child-drop { background: #2a1a3a; color: #e0a0ff; border: 1px solid #5a3a7a; border-radius: 999px; padding: 4px 10px; font-size: 0.78rem; font-weight: 600; max-width: 220px; height: auto; }
   .child-list { margin-top: 8px; border-top: 1px solid #333; padding-top: 8px; }
   .child-item { background: #222; border: 1px solid #444; border-radius: 6px; padding: 8px; margin: 4px 0; }
   label.load { display: inline-block; background: #222; border: 1px solid #444; padding: 10px 14px; border-radius: 8px; cursor: pointer; margin-right: 8px; }
@@ -52,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.002</h1>
+  <h1>Movie Desk 0.7.004</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -845,8 +846,17 @@ function render() {
     const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
     const boutNote = bout ? `<span class="flag" style="background:#5a3a00;color:#ffd580" data-boutique="${m.id}">Boutique: ${bout}</span>` : `<span class="flag" style="background:#333;color:#aaa" data-boutique="${m.id}">+ Boutique</span>`;
     const pkgNote = m.fromPackage ? `<span class="flag pkg" data-mother-id="${m.motherId||""}" style="cursor:pointer">From mother</span>` : "";
-    const childHtml = (m.isMother && m.children && m.children.length)
-      ? `<div class="child-list" data-mother="${m.id}">${m.children.map(cid => { const c = getById(cid); return c ? `<div class="child-item">${c.title}${c.barcode ? " | " + c.barcode : ""}</div>` : ""; }).join("")}</div>`
+    const childDrop = (m.isMother && m.children && m.children.length)
+      ? (function() {
+          const opts = m.children.map(function(cid) {
+            const c = getById(cid);
+            if (!c) return "";
+            const t = String(c.title || cid).replace(/&/g, "&").replace(/</g, "<");
+            const extra = c.discType ? " | " + c.discType : "";
+            return '<option value="' + cid + '">' + t + extra + '</option>';
+          }).join("");
+          return '<select class="child-drop" data-mother="' + m.id + '"><option value="">Children (' + m.children.length + ')</option>' + opts + '</select>';
+        })()
       : "";
     const friendTag = friendTagFor(m.title);
     const cover = m.coverUrl ? `<img class="card-cover" src="${m.coverUrl}" alt="">` : `<div class="card-cover"></div>`;
@@ -857,13 +867,13 @@ function render() {
         <div class="card-meta">${m.year || ""}${m.discType ? " | " + m.discType : ""}${m.edition ? " | " + m.edition : ""}</div>
         <div class="card-flags">
           <span class="flag own">Owned</span>
+          ${childDrop}
           ${pkgNote}
           ${boutNote}
           <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homo: ${isYes?"yes":"no"}</span>
           <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
           ${myRatings[norm(m.title)] ? `<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ${myRatings[norm(m.title)]}</span>` : ""}
         </div>
-        ${childHtml}
       </div>
     </div>`;
   }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
@@ -889,14 +899,16 @@ function render() {
       render();
     };
   });
+  document.querySelectorAll(".child-drop").forEach(el => {
+    el.onclick = (e) => e.stopPropagation();
+    el.onchange = () => {
+      const id = el.value;
+      el.value = "";
+      if (id) openEdit(id);
+    };
+  });
   document.querySelectorAll(".card-title[data-mother]").forEach(el => {
-    const mid = el.dataset.mother;
     el.onclick = () => {
-      if (mid) {
-        const list = document.querySelector(`.child-list[data-mother="${mid}"]`);
-        if (list) list.classList.toggle("show");
-      }
-      const card = el.closest(".card");
       const id = el.dataset.id || "";
       const title = el.textContent.trim();
       if (id) showLastId(id, title);
