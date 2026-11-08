@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.005</title>
+<title>Movie Desk 0.7.007</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -15,7 +15,7 @@
   .add-row, .buy-row { display: flex; gap: 8px; align-items: center; }
   .add-row input, .buy-row input { flex: 1; margin: 0; }
   button { background: #222; color: #eee; border: 1px solid #444; padding: 0 16px; border-radius: 12px; cursor: pointer; height: 48px; }
-  .suggest, .buy-results { position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; max-height: 240px; overflow-y: auto; z-index: 20; display: none; }
+  .suggest, .buy-results { position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; max-height: 220px; overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 20; display: none; }
   .suggest.show, .buy-results.show { display: block; }
   .suggest div, .buy-results div { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #2a2a2a; }
   .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.005</h1>
+  <h1>Movie Desk 0.7.007</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -782,7 +782,7 @@ function boutiqueSuggest(query, box) {
   if (digits.length < 4) return false;
   const hits = [];
   const keys = Object.keys(boutiqueCatalog);
-  for (let i = 0; i < keys.length && hits.length < 8; i++) {
+  for (let i = 0; i < keys.length && hits.length < 33; i++) {
     const bc = keys[i];
     if (bc.indexOf(digits) === -1) continue;
     const row = boutiqueCatalog[bc];
@@ -808,10 +808,18 @@ async function omdbSuggest(query, box) {
   if (boutiqueSuggest(query, box)) return;
   if (!query || query.length < 3) { box.classList.remove("show"); return; }
   try {
-    const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&apikey=${OMDB_KEY}`);
-    const d = await res.json();
-    if (d.Search) {
-      box.innerHTML = d.Search.slice(0,8).map(m => `<div data-title="${m.Title}" data-id="${m.imdbID}">${m.Title} (${m.Year})</div>`).join("");
+    const pages = [1, 2, 3, 4];
+    const all = [];
+    for (const p of pages) {
+      if (all.length >= 33) break;
+      const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(query)}&page=${p}&apikey=${OMDB_KEY}`);
+      const d = await res.json();
+      if (!d.Search || !d.Search.length) break;
+      all.push(...d.Search);
+      if (d.Search.length < 10) break;
+    }
+    if (all.length) {
+      box.innerHTML = all.slice(0, 33).map(m => `<div data-title="${m.Title}" data-id="${m.imdbID}">${m.Title} (${m.Year})</div>`).join("");
       box.classList.add("show");
       box.querySelectorAll("div").forEach(el => {
         el.onclick = () => {
