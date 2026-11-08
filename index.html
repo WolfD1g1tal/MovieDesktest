@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.004</title>
+<title>Movie Desk 0.7.005</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -37,7 +37,7 @@
   .imdb { background: #2a2a1a; color: #e0c07a; }
   .you { background: #0a2a2a; color: #00e5ff; }
   .pkg { background: #2a1a2a; color: #e0a07a; }
-  .child-drop { background: #2a1a3a; color: #e0a0ff; border: 1px solid #5a3a7a; border-radius: 999px; padding: 4px 10px; font-size: 0.78rem; font-weight: 600; max-width: 220px; height: auto; }
+  .child-drop { background: #2a1a3a; color: #e0a0ff; border: 1px solid #5a3a7a; border-radius: 8px; padding: 4px; font-size: 0.85rem; font-weight: 600; width: 100%; max-width: 320px; height: auto; }
   .child-list { margin-top: 8px; border-top: 1px solid #333; padding-top: 8px; }
   .child-item { background: #222; border: 1px solid #444; border-radius: 6px; padding: 8px; margin: 4px 0; }
   label.load { display: inline-block; background: #222; border: 1px solid #444; padding: 10px 14px; border-radius: 8px; cursor: pointer; margin-right: 8px; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.004</h1>
+  <h1>Movie Desk 0.7.005</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -855,7 +855,7 @@ function render() {
             const extra = c.discType ? " | " + c.discType : "";
             return '<option value="' + cid + '">' + t + extra + '</option>';
           }).join("");
-          return '<select class="child-drop" data-mother="' + m.id + '"><option value="">Children (' + m.children.length + ')</option>' + opts + '</select>';
+          return '<select class="child-drop" size="5" data-mother="' + m.id + '"><option value="">Children (' + m.children.length + ')</option>' + opts + '</select>';
         })()
       : "";
     const friendTag = friendTagFor(m.title);
