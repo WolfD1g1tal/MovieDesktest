@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.008.9</title>
+<title>Movie Desk 0.7.009.1</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -43,8 +43,8 @@
   label.load { display: inline-block; background: #222; border: 1px solid #444; padding: 10px 14px; border-radius: 8px; cursor: pointer; margin-right: 8px; }
   input[type=file] { display: none; }
   .section-label { color: #888; font-size: 0.85rem; margin: 16px 0 4px; }
-  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 100; }
-  .modal.show { display: flex; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 9999; }
+  .modal.show { display: flex !important; }
   .modal-box { background: #1a1a1a; border: 1px solid #333; border-radius: 16px; padding: 20px; max-width: 320px; width: 90%; }
   .modal-box p { margin: 0 0 16px; white-space: pre-line; }
   .modal-box label { display: block; margin: 8px 0; font-size: 0.9rem; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.008.9</h1>
+  <h1>Movie Desk 0.7.009.1</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -161,6 +161,11 @@
 
 
 <script>
+function closeModal(){
+  var m = document.getElementById("modal");
+  if (m) { m.className = "modal"; m.style.display = "none"; }
+  document.body.style.overflow = "";
+}
 const OMDB_KEY = "8d83ba51";
 const UPCMDB_KEY = "d207a24928dc0f20f056afe5cb887437";
 const UPCDATABASE_KEY = "7451A8510DEE05A60529AAE24745905D";
@@ -405,13 +410,18 @@ $("lastIdCopy").onclick = () => {
 function showPopup(msg){
   if (sessionStorage.getItem("md_popup_off") === "1") return;
   if (localStorage.getItem("md_popup_off") === "1") return;
-  const modal = document.getElementById("modal");
-  if (!modal) return;
-  const msgEl = document.getElementById("modalMsg");
-  if (msgEl) msgEl.textContent = msg;
-  modal.style.cssText = "";
-  modal.classList.add("show");
-  document.body.style.overflow = "hidden";
+  var b = document.getElementById("toast");
+  if (!b) {
+    b = document.createElement("div");
+    b.id = "toast";
+    b.style.cssText = "position:fixed;top:12px;left:12px;right:12px;z-index:99999;background:#1a1a1a;border:1px solid #444;border-radius:12px;padding:14px 16px;color:#eee;font-size:0.95rem;box-shadow:0 4px 20px rgba(0,0,0,.6);";
+    b.onclick = function(){ b.style.display = "none"; };
+    document.body.appendChild(b);
+  }
+  b.textContent = msg + "  (tap to dismiss)";
+  b.style.display = "block";
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ b.style.display = "none"; }, 4000);
 }
 window.closeModal = function() {
   const modal = document.getElementById("modal");
@@ -1347,12 +1357,12 @@ function parseFriendCsv(text) {
 }
 </script>
 
-<div class="modal" id="modal" style="z-index:9999;">
-  <div class="modal-box">
+<div class="modal" id="modal" style="display:none !important;" style="z-index:9999;" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
     <p id="modalMsg" style="margin:0 0 16px;"></p>
     <label style="display:block;margin:8px 0;"><input type="checkbox" id="modalDisable"> Disable</label>
     <label style="display:block;margin:8px 0;"><input type="checkbox" id="modalSession"> Disable for this session</label>
-    <button id="modalOk" type="button" style="float:none;display:block;width:100%;margin-top:12px;height:44px;font-size:1rem;background:#333;color:#fff;border:none;border-radius:8px;">Close</button>
+    <button id="modalOk" type="button" onclick="closeModal();return false;" style="float:none;display:block;width:100%;margin-top:12px;height:44px;font-size:1rem;background:#333;color:#fff;border:none;border-radius:8px;position:relative;z-index:10000;">Close</button>
   </div>
 </div>
 
