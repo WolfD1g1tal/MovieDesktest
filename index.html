@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.008.5</title>
+<title>Movie Desk 0.7.008.7</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.008.5</h1>
+  <h1>Movie Desk 0.7.008.7</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -159,11 +159,12 @@
 </div>
 
 <div class="modal" id="modal">
-  <div class="modal-box">
-    <p id="modalMsg"></p>
+  <div class="modal-box" style="position:relative;">
+    <span id="modalX" onclick="closeModal()" style="position:absolute;top:8px;right:12px;font-size:1.4rem;cursor:pointer;color:#888;z-index:101;">?</span>
+    <p id="modalMsg" style="margin-top:20px;"></p>
     <label><input type="checkbox" id="modalDisable"> Disable</label>
     <label><input type="checkbox" id="modalSession"> Disable for this session</label>
-    <button id="modalOk">OK</button>
+    <button id="modalOk" type="button" onclick="closeModal()" style="float:none;display:block;width:100%;margin-top:12px;height:44px;font-size:1rem;position:relative;z-index:101;">OK</button>
   </div>
 </div>
 
@@ -417,22 +418,30 @@ function showPopup(msg){
   const msgEl = $("modalMsg");
   if (msgEl) msgEl.textContent = msg;
   modal.style.display = "";
+  modal.style.visibility = "visible";
   modal.classList.add("show");
 }
-function closeModal() {
-  const modal = $("modal");
-  if ($("modalDisable") && $("modalDisable").checked) localStorage.setItem("md_popup_off","1");
-  if ($("modalSession") && $("modalSession").checked) sessionStorage.setItem("md_popup_off","1");
+window.closeModal = function() {
+  const modal = document.getElementById("modal");
+  const dis = document.getElementById("modalDisable");
+  const ses = document.getElementById("modalSession");
+  if (dis && dis.checked) localStorage.setItem("md_popup_off","1");
+  if (ses && ses.checked) sessionStorage.setItem("md_popup_off","1");
   if (modal) {
     modal.classList.remove("show");
-    modal.style.display = "none";
+    modal.style.cssText = "display:none !important;visibility:hidden;";
   }
-  if ($("modalDisable")) $("modalDisable").checked = false;
-  if ($("modalSession")) $("modalSession").checked = false;
+  if (dis) dis.checked = false;
+  if (ses) ses.checked = false;
+};
+function bindModalClose() {
+  const ok = $("modalOk"), x = $("modalX"), modal = $("modal");
+  if (ok) ok.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
+  if (x) x.onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
+  if (modal) modal.onclick = (e) => { if (e.target === modal || e.target.id === "modalOk" || e.target.id === "modalX") closeModal(); };
 }
-$("modalOk").onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
-const modalEl = $("modal");
-if (modalEl) modalEl.onclick = (e) => { if (e.target === modalEl) closeModal(); };
+bindModalClose();
+setTimeout(bindModalClose, 100);
 
 function getAll(){ return [...collection, ...manualTitles]; }
 function getById(id){ return getAll().find(x => x.id === id); }
