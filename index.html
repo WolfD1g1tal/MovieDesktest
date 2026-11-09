@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.009.1</title>
+<title>Movie Desk 0.7.010</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.009.1</h1>
+  <h1>Movie Desk 0.7.010</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -885,6 +885,182 @@ async function omdbSuggest(query, box) {
   } catch(e) { box.classList.remove("show"); }
 }
 
+
+async function gatherCovers(m) {
+  const urls = [];
+  const seen = new Set();
+  function add(url, label) {
+    if (!url || url === "N/A" || seen.has(url)) return;
+    seen.add(url);
+    urls.push({ url, label });
+  }
+  const bout = lookupBoutique(m.barcode);
+  if (bout && bout.coverUrl) add(bout.coverUrl, "Boutique");
+  if (m.coverUrl) add(m.coverUrl, "Current");
+  if (OMDB_KEY) {
+    if (m.imdbId) {
+      try {
+        const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(m.imdbId) + "&apikey=" + OMDB_KEY);
+        const d = await res.json();
+        if (d && d.Poster) add(d.Poster, "OMDB");
+      } catch(e) {}
+    }
+    if (m.title) {
+      try {
+        const res = await fetch("https://www.omdbapi.com/?s=" + encodeURIComponent(m.title) + "&apikey=" + OMDB_KEY);
+        const d = await res.json();
+        if (d && d.Search) {
+          for (const s of d.Search.slice(0, 4)) {
+            if (s.Poster) add(s.Poster, "OMDB search");
+          }
+        }
+      } catch(e) {}
+    }
+  }
+  if (m.barcode) {
+    try {
+      const res = await fetch("https://barcode-proxy.frankiymydear.workers.dev/?upc=" + encodeURIComponent(m.barcode));
+      const d = await res.json();
+      const item = d.items && d.items[0];
+      if (item && item.images) {
+        for (const img of item.images.slice(0, 3)) add(img, "UPC");
+      }
+    } catch(e) {}
+  }
+  return urls;
+}
+
+let currentPickId = null;
+let selectedCoverUrl = null;
+
+async function pickCover(id) {
+  const m = getById(id);
+  if (!m) return;
+  currentPickId = id;
+  selectedCoverUrl = null;
+  const box = document.getElementById("coverPicker");
+  if (!box) return;
+  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><div><button type="button" id="coverCam" title="Take photo" style="background:none;border:none;color:#eee;font-size:1.4rem;cursor:pointer;padding:4px 8px">??</button><button type="button" id="coverFile" title="From gallery" style="background:none;border:none;color:#eee;font-size:1.2rem;cursor:pointer;padding:4px 8px">??</button><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;font-size:1.2rem;cursor:pointer;padding:4px">?</button></div></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + (m.title||"") + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button><button id="coverCropSel" type="button" disabled style="flex:1;height:40px;background:#2a2a2a;color:#eee;border:none;border-radius:8px">Crop selected</button></div></div>';
+  box.style.display = "flex";
+  const thumbs = document.getElementById("coverThumbs");
+  thumbs.innerHTML = '<span style="color:#888">Loading covers...</span>';
+  const urls = await gatherCovers(m);
+  function renderThumbs() {
+    thumbs.innerHTML = urls.map((u, i) => '<div style="text-align:center"><img src="' + u.url.replace(/"/g,"") + '" data-url="' + u.url.replace(/"/g,"") + '" data-idx="' + i + '" style="width:90px;height:135px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid #333"><div style="font-size:0.7rem;color:#888;margin-top:2px">' + u.label + '</div></div>').join("") || '<span style="color:#888">No covers found. Add URL, camera, or file.</span>';
+  }
+  renderThumbs();
+  function selectUrl(url) {
+    selectedCoverUrl = url;
+    document.querySelectorAll("#coverThumbs img").forEach(im => im.style.borderColor = im.dataset.url === url ? "#6af" : "#333");
+    document.getElementById("coverUseSel").disabled = false;
+    document.getElementById("coverCropSel").disabled = false;
+  }
+  thumbs.onclick = function(e) {
+    const img = e.target.closest("img[data-url]");
+    if (img) selectUrl(img.dataset.url);
+  };
+  document.getElementById("coverCancel").onclick = () => { box.style.display = "none"; };
+  document.getElementById("coverAddUrl").onclick = () => {
+    const v = (document.getElementById("coverPaste").value || "").trim();
+    if (v) { urls.push({ url: v, label: "URL" }); document.getElementById("coverPaste").value = ""; renderThumbs(); selectUrl(v); }
+  };
+  document.getElementById("coverUseSel").onclick = () => {
+    if (selectedCoverUrl) { setCover(id, selectedCoverUrl); box.style.display = "none"; }
+  };
+  document.getElementById("coverCropSel").onclick = () => {
+    if (selectedCoverUrl) openCropper(selectedCoverUrl, id);
+  };
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      urls.push({ url: dataUrl, label: "Photo" });
+      renderThumbs();
+      selectUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  }
+  document.getElementById("coverCam").onclick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
+    inp.onchange = () => handleFile(inp.files && inp.files[0]);
+    inp.click();
+  };
+  document.getElementById("coverFile").onclick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = () => handleFile(inp.files && inp.files[0]);
+    inp.click();
+  };
+  box.onclick = function(e) { if (e.target === box) box.style.display = "none"; };
+}
+
+function openCropper(url, id) {
+  const box = document.getElementById("coverPicker");
+  const panel = document.getElementById("coverPanel");
+  if (!panel) return;
+  panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>Crop cover</span><button type="button" id="cropCancel" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button></div><canvas id="cropCanvas" style="width:100%;max-height:60vh;background:#111;border-radius:8px;touch-action:none"></canvas><p style="font-size:0.8rem;color:#888;margin:6px 0">Drag to select crop area</p><div style="display:flex;gap:8px"><button id="cropApply" type="button" style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use crop</button><button id="cropSkip" type="button" style="flex:1;height:40px;background:#222;color:#aaa;border:none;border-radius:8px">Use original</button></div>';
+  const canvas = document.getElementById("cropCanvas");
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    const maxW = panel.clientWidth - 24 || 400;
+    const scale = Math.min(1, maxW / img.width, 400 / img.height);
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    let startX, startY, endX, endY, dragging = false;
+    function drawSel() {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (dragging || (startX != null)) {
+        const x = Math.min(startX, endX), y = Math.min(startY, endY);
+        const w = Math.abs(endX - startX), h = Math.abs(endY - startY);
+        ctx.strokeStyle = "#6af"; ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.fillRect(0, 0, canvas.width, y);
+        ctx.fillRect(0, y + h, canvas.width, canvas.height - y - h);
+        ctx.fillRect(0, y, x, h);
+        ctx.fillRect(x + w, y, canvas.width - x - w, h);
+      }
+    }
+    function pos(e) {
+      const r = canvas.getBoundingClientRect();
+      const t = e.touches ? e.touches[0] : e;
+      return { x: (t.clientX - r.left) * (canvas.width / r.width), y: (t.clientY - r.top) * (canvas.height / r.height) };
+    }
+    canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); const p = pos(e); startX = endX = p.x; startY = endY = p.y; dragging = true; };
+    canvas.onmousemove = canvas.ontouchmove = e => { if (!dragging) return; e.preventDefault(); const p = pos(e); endX = p.x; endY = p.y; drawSel(); };
+    canvas.onmouseup = canvas.ontouchend = () => { dragging = false; drawSel(); };
+    document.getElementById("cropApply").onclick = () => {
+      if (startX == null) { setCover(id, url); box.style.display = "none"; return; }
+      const x = Math.min(startX, endX) / scale, y = Math.min(startY, endY) / scale;
+      const w = Math.abs(endX - startX) / scale, h = Math.abs(endY - startY) / scale;
+      if (w < 10 || h < 10) { setCover(id, url); box.style.display = "none"; return; }
+      const c2 = document.createElement("canvas");
+      c2.width = w; c2.height = h;
+      c2.getContext("2d").drawImage(img, x, y, w, h, 0, 0, w, h);
+      setCover(id, c2.toDataURL("image/jpeg", 0.85));
+      box.style.display = "none";
+    };
+    document.getElementById("cropSkip").onclick = () => { setCover(id, url); box.style.display = "none"; };
+    document.getElementById("cropCancel").onclick = () => { box.style.display = "none"; };
+  };
+  img.onerror = () => { setCover(id, url); box.style.display = "none"; };
+  img.src = url;
+}
+
+function setCover(id, url) {
+  const m = getById(id);
+  if (!m) return;
+  m.coverUrl = url;
+  if (collection.find(x => x.id === id)) saveColl();
+  else saveManual();
+  render();
+}
+
 function render() {
   const q = norm($("q").value);
   let all = getAll();
@@ -919,7 +1095,7 @@ function render() {
         })()
       : "";
     const friendTag = friendTagFor(m.title);
-    const cover = m.coverUrl ? `<img class="card-cover" src="${m.coverUrl}" alt="">` : `<div class="card-cover"></div>`;
+    const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="">` : `<div class="card-cover" data-pick="${m.id}"></div>`;
     return `<div class="card">
       ${cover}
       <div class="card-body">
@@ -1365,6 +1541,9 @@ function parseFriendCsv(text) {
     <button id="modalOk" type="button" onclick="closeModal();return false;" style="float:none;display:block;width:100%;margin-top:12px;height:44px;font-size:1rem;background:#333;color:#fff;border:none;border-radius:8px;position:relative;z-index:10000;">Close</button>
   </div>
 </div>
+
+
+<div id="coverPicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;"></div>
 
 </body>
 </html>
