@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.008.2</title>
+<title>Movie Desk 0.7.008.3</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.008.2</h1>
+  <h1>Movie Desk 0.7.008.3</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -811,7 +811,7 @@ async function barcodeExternalSuggest(query, box) {
     const result = await lookupBarcode(digits);
     if (!result || !result.matches || !result.matches.length) return false;
     box.innerHTML = result.matches.slice(0, 20).map(m => {
-      const t = (m.title || "").replace(/"/g, """);
+      const t = (m.title || "").replace(/"/g, "&quot;");
       return `<div data-barcode="${digits}" data-title="${t}" data-id="${m.imdbId || ""}">${m.title}<br><span style="color:#888;font-size:0.75rem">${digits} | ${m.source || "lookup"}</span></div>`;
     }).join("");
     box.classList.add("show");
