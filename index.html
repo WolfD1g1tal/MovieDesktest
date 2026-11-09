@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.010</title>
+<title>Movie Desk 0.7.011</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.010</h1>
+  <h1>Movie Desk 0.7.011</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -1095,7 +1095,7 @@ function render() {
         })()
       : "";
     const friendTag = friendTagFor(m.title);
-    const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="">` : `<div class="card-cover" data-pick="${m.id}"></div>`;
+    const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.7rem">cover</div>`;
     return `<div class="card">
       ${cover}
       <div class="card-body">
@@ -1114,6 +1114,9 @@ function render() {
     </div>`;
   }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
 
+  document.querySelectorAll("[data-pick]").forEach(el => {
+    el.onclick = () => pickCover(el.dataset.pick);
+  });
   document.querySelectorAll(".flag[data-key]").forEach(el => {
     el.onclick = () => {
       const k = el.dataset.key;
