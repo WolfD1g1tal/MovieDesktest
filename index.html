@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.007</title>
+<title>Movie Desk 0.7.008</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.007</h1>
+  <h1>Movie Desk 0.7.008</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -867,7 +867,7 @@ function render() {
         })()
       : "";
     const friendTag = friendTagFor(m.title);
-    const cover = m.coverUrl ? `<img class="card-cover" src="${m.coverUrl}" alt="">` : `<div class="card-cover"></div>`;
+    const cover = m.coverUrl ? `<img class="card-cover" src="${m.coverUrl}" alt="" data-cover-id="${m.id}" style="cursor:pointer" title="Tap to pick cover">` : `<div class="card-cover" data-cover-id="${m.id}" style="cursor:pointer" title="Tap to pick cover"></div>`;
     return `<div class="card">
       ${cover}
       <div class="card-body">
@@ -930,6 +930,40 @@ function render() {
         btn.textContent = "Copied";
         setTimeout(() => btn.textContent = old, 1000);
       });
+    };
+  });
+  document.querySelectorAll("[data-cover-id]").forEach(el => {
+    el.onclick = (e) => { e.stopPropagation(); openCoverPicker(el.dataset.coverId); };
+  });
+}
+
+function openCoverPicker(id) {
+  const m = getById(id);
+  if (!m) return;
+  const opts = [];
+  if (m.coverUrl) opts.push({ label: "Current", url: m.coverUrl });
+  const bc = m.barcode || m.ean || "";
+  if (bc && boutiqueCatalog[bc] && boutiqueCatalog[bc].coverUrl) {
+    opts.push({ label: "Boutique: " + (boutiqueCatalog[bc].label || "label"), url: boutiqueCatalog[bc].coverUrl });
+  }
+  Object.keys(boutiqueCatalog).forEach(k => {
+    const row = boutiqueCatalog[k];
+    if (row && row.title && norm(row.title) === norm(m.title) && row.coverUrl && !opts.some(o => o.url === row.coverUrl)) {
+      opts.push({ label: "Boutique: " + (row.label || "label") + (row.edition ? " | " + row.edition : ""), url: row.coverUrl });
+    }
+  });
+  opts.push({ label: "Clear cover", url: "" });
+  const msgEl = $("modalMsg");
+  const modal = $("modal");
+  if (!msgEl || !modal) return;
+  msgEl.innerHTML = "<b>Pick cover</b><div style='max-height:200px;overflow:auto;margin-top:8px'>" + opts.map(o => `<div style="padding:8px;border-bottom:1px solid #333;cursor:pointer" data-url="${(o.url||"").replace(/"/g,""")}">${o.label}</div>`).join("") + "</div>";
+  modal.classList.add("show");
+  msgEl.querySelectorAll("[data-url]").forEach(el => {
+    el.onclick = () => {
+      m.coverUrl = el.dataset.url || "";
+      if (collection.some(x => x.id === m.id)) saveColl(); else saveManual();
+      modal.classList.remove("show");
+      render();
     };
   });
 }
