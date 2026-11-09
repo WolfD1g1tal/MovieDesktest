@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.008.4</title>
+<title>Movie Desk 0.7.008.5</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -53,7 +53,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.008.4</h1>
+  <h1>Movie Desk 0.7.008.5</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -416,16 +416,23 @@ function showPopup(msg){
   if (!modal) return;
   const msgEl = $("modalMsg");
   if (msgEl) msgEl.textContent = msg;
+  modal.style.display = "";
   modal.classList.add("show");
 }
-$("modalOk").onclick = () => {
+function closeModal() {
   const modal = $("modal");
   if ($("modalDisable") && $("modalDisable").checked) localStorage.setItem("md_popup_off","1");
   if ($("modalSession") && $("modalSession").checked) sessionStorage.setItem("md_popup_off","1");
-  if (modal) modal.classList.remove("show");
+  if (modal) {
+    modal.classList.remove("show");
+    modal.style.display = "none";
+  }
   if ($("modalDisable")) $("modalDisable").checked = false;
   if ($("modalSession")) $("modalSession").checked = false;
-};
+}
+$("modalOk").onclick = (e) => { e.preventDefault(); e.stopPropagation(); closeModal(); };
+const modalEl = $("modal");
+if (modalEl) modalEl.onclick = (e) => { if (e.target === modalEl) closeModal(); };
 
 function getAll(){ return [...collection, ...manualTitles]; }
 function getById(id){ return getAll().find(x => x.id === id); }
