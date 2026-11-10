@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.011</title>
+<title>Movie Desk 0.7.012</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -21,12 +21,17 @@
   .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
   #scanner { display: none; margin: 12px 0; }
   #scanner video { width: 100%; border-radius: 12px; background: #000; }
-  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 12px; align-items: flex-start; }
-  .card-cover { width: 60px; height: 90px; object-fit: cover; border-radius: 4px; background: #222; flex-shrink: 0; }
+  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; }
+  .card-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 6px; background: #222; flex-shrink: 0; }
   .card-body { flex: 1; min-width: 0; }
-  .card-title { font-weight: 500; font-size: 1rem; margin: 0 0 2px; cursor: pointer; }
+  .card-title { font-weight: 500; font-size: 1.05rem; margin: 0 0 2px; cursor: pointer; }
   .card-meta { color: #aaa; font-size: 0.8rem; margin: 2px 0 6px; }
   .card-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nav { display: flex; gap: 4px; margin: 8px 0; }
+  .nav button { flex: 1; height: 40px; font-size: 0.85rem; }
+  .nav button.active { background: #333; border-color: #666; }
+  .section { display: none; }
+  .section.active { display: block; }
   .child-list { margin-top: 8px; margin-left: 24px; border-left: 2px solid #6a3a8a; padding-left: 10px; display: none; }
   .child-list.show { display: block; }
   .child-item { background: #2a1a3a; border: 1px solid #5a3a7a; border-radius: 6px; padding: 8px; margin: 4px 0; color: #d0a0e0; }
@@ -53,82 +58,83 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.011</h1>
+  <h1>Movie Desk 0.7.012</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
-  <div>
-    <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
-    <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
-    <label class="load">Load Boutique Catalog<input type="file" id="fboutique" accept=".csv"></label>
-    <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
-    <button id="exportBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;border-radius:6px;">Export Library</button>
+  <div class="nav">
+    <button id="tabInventory" class="active">Inventory</button>
+    <button id="tabAdd">Add</button>
+    <button id="tabWatch">Watchlist</button>
+    <button id="tabSettings">Settings</button>
   </div>
 
-  <div class="section-label">Add Mother (package / single title)</div>
-  <div class="add-wrap">
-    <div class="add-row">
-      <div style="position:relative;flex:1;display:flex;align-items:center;">
-        <input type="text" id="motherTitle" placeholder="Mother title or barcode..." autocomplete="off" style="flex:1;padding-right:28px;">
-        <span id="motherClear" style="position:absolute;right:8px;cursor:pointer;color:#888;font-size:0.85rem;display:none;">clear</span>
+  <div id="secInventory" class="section active">
+    <input type="search" id="q" placeholder="Search your titles...">
+    <div id="out"></div>
+  </div>
+
+  <div id="secAdd" class="section">
+    <div class="section-label">Add Mother (package / single title)</div>
+    <div class="add-wrap">
+      <div class="add-row">
+        <div style="position:relative;flex:1;display:flex;align-items:center;">
+          <input type="text" id="motherTitle" placeholder="Mother title or barcode..." autocomplete="off" style="flex:1;padding-right:28px;">
+          <span id="motherClear" style="position:absolute;right:8px;cursor:pointer;color:#888;font-size:0.85rem;display:none;">clear</span>
+        </div>
+        <button id="motherAddBtn">Add Mother</button>
+        <button id="motherScanBtn">Scan</button>
       </div>
-      <button id="motherAddBtn">Add Mother</button>
-      <button id="motherScanBtn">Scan</button>
+      <div class="suggest" id="motherSuggest"></div>
     </div>
-    <div class="suggest" id="motherSuggest"></div>
+    <div class="section-label">Add Child to Mother</div>
+    <div id="lastIdBar" style="font-size:0.8rem;color:#aaa;margin:2px 0 8px;display:flex;align-items:center;gap:8px;">
+      <span id="lastIdText">Last ID: -</span>
+      <button id="lastIdCopy" style="height:22px;padding:0 8px;font-size:0.7rem;background:#333;border:1px solid #555;color:#fff;">Copy</button>
+    </div>
+    <div class="add-wrap">
+      <div class="add-row">
+        <input type="text" id="childTitle" placeholder="Child title or barcode..." autocomplete="off">
+        <input type="text" id="motherIdInput" placeholder="Mother ID" style="max-width:140px">
+        <button id="childAddBtn">Add Child</button>
+        <button id="childScanBtn">Scan</button>
+      </div>
+      <div class="suggest" id="childSuggest"></div>
+    </div>
+    <div id="barcodeStatus" style="display:none; font-size:0.75rem; color:#aaa; margin:6px 0 10px; padding:8px; background:#161616; border-radius:8px; border:1px solid #2a2a2a;"></div>
+    <div id="scanner"><video id="video" autoplay playsinline></video></div>
   </div>
 
-  <div class="section-label">Add Child to Mother</div>
-  <div id="lastIdBar" style="font-size:0.8rem;color:#aaa;margin:2px 0 8px;display:flex;align-items:center;gap:8px;">
-    <span id="lastIdText">Last ID: -</span>
-    <button id="lastIdCopy" style="height:22px;padding:0 8px;font-size:0.7rem;background:#333;border:1px solid #555;color:#fff;">Copy</button>
-  </div>
-  <div class="add-wrap">
-    <div class="add-row">
-      <input type="text" id="childTitle" placeholder="Child title or barcode..." autocomplete="off">
-      <input type="text" id="motherIdInput" placeholder="Mother ID" style="max-width:140px">
-      <button id="childAddBtn">Add Child</button>
-      <button id="childScanBtn">Scan</button>
+  <div id="secWatch" class="section">
+    <div id="watchControls">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <label class="load">Upload Personal Watchlist<input type="file" id="myWatch" accept=".csv,.txt"></label>
+        <label class="load">Upload Friend Watchlist<input type="file" id="friendWatch" accept=".csv,.txt"></label>
+        <button id="watchModePersonal" style="height:28px;padding:0 10px;font-size:0.75rem;">Personal</button>
+        <button id="watchModeFriend" style="height:28px;padding:0 10px;font-size:0.75rem;">Friend</button>
+        <button id="watchShared" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;">Shared</button>
+      </div>
     </div>
-    <div class="suggest" id="childSuggest"></div>
+    <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
   </div>
 
-  <div class="section-label">Friend Data</div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
-    <input type="text" id="friendName" placeholder="Friend first name" style="max-width:160px;margin:0;">
-    <label class="load">Friend Inventory<input type="file" id="friendInv" accept=".csv,.txt"></label>
-    <label class="load">Friend Ratings<input type="file" id="friendRatings" accept=".csv,.txt"></label>
-    <label class="load">Friend Watchlist<input type="file" id="friendWatchData" accept=".csv,.txt"></label>
-  </div>
-  <div class="section-label">Sections</div>
-  <div style="display:flex;gap:8px;margin-bottom:10px;flex-wrap:wrap;">
-    <button id="tabInventory" style="height:36px;">My Inventory</button>
-    <button id="tabRated" style="height:36px;">Rated</button>
-    <button id="tabWatch" style="height:36px;">Watchlist</button>
-    <button id="tabSettings" style="height:36px;">Settings</button>
-  </div>
-  <div id="watchControls" style="display:none;margin-bottom:10px;">
-    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
-      <label class="load">Upload Personal Watchlist<input type="file" id="myWatch" accept=".csv,.txt"></label>
-      <label class="load">Upload Friend Watchlist<input type="file" id="friendWatch" accept=".csv,.txt"></label>
-      <button id="watchModePersonal" style="height:28px;padding:0 10px;font-size:0.75rem;">Personal</button>
-      <button id="watchModeFriend" style="height:28px;padding:0 10px;font-size:0.75rem;">Friend</button>
-      <button id="watchShared" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;">Shared Watchlist</button>
+  <div id="secSettings" class="section">
+    <div>
+      <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
+      <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
+      <label class="load">Load Boutique Catalog<input type="file" id="fboutique" accept=".csv"></label>
+      <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
+      <button id="exportBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;border-radius:6px;">Export Library</button>
     </div>
-  </div>
-  <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
-  <div class="buy-wrap">
-    <div class="buy-row">
-      <input type="text" id="buyQuery" placeholder="Search to buy..." autocomplete="off">
-      <button id="buyBtn">Search</button>
+    <div class="section-label">Friend Data</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+      <input type="text" id="friendName" placeholder="Friend first name" style="max-width:160px;margin:0;">
+      <label class="load">Friend Inventory<input type="file" id="friendInv" accept=".csv,.txt"></label>
+      <label class="load">Friend Ratings<input type="file" id="friendRatings" accept=".csv,.txt"></label>
+      <label class="load">Friend Watchlist<input type="file" id="friendWatchData" accept=".csv,.txt"></label>
     </div>
-    <div class="buy-results" id="buyResults"></div>
+    <div id="settingsOut" style="margin-top:12px;"></div>
   </div>
-
-  <div id="barcodeStatus" style="display:none; font-size:0.75rem; color:#aaa; margin:6px 0 10px; padding:8px; background:#161616; border-radius:8px; border:1px solid #2a2a2a;"></div>
-  <div id="scanner"><video id="video" autoplay playsinline></video></div>
-  <input type="search" id="q" placeholder="Search your titles...">
-  <div id="out"></div>
 </main>
 
 <div class="modal" id="editPanel">
@@ -940,7 +946,7 @@ async function pickCover(id) {
   selectedCoverUrl = null;
   const box = document.getElementById("coverPicker");
   if (!box) return;
-  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><div><button type="button" id="coverCam" title="Take photo" style="background:none;border:none;color:#eee;font-size:1.4rem;cursor:pointer;padding:4px 8px">??</button><button type="button" id="coverFile" title="From gallery" style="background:none;border:none;color:#eee;font-size:1.2rem;cursor:pointer;padding:4px 8px">??</button><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;font-size:1.2rem;cursor:pointer;padding:4px">?</button></div></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + (m.title||"") + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button><button id="coverCropSel" type="button" disabled style="flex:1;height:40px;background:#2a2a2a;color:#eee;border:none;border-radius:8px">Crop selected</button></div></div>';
+  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><div style="display:flex;gap:4px"><button type="button" id="coverCam" title="Take photo" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" id="coverFile" title="From gallery" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + (m.title||"") + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button><button id="coverCropSel" type="button" disabled style="flex:1;height:40px;background:#2a2a2a;color:#eee;border:none;border-radius:8px">Crop selected</button></div></div>';
   box.style.display = "flex";
   const thumbs = document.getElementById("coverThumbs");
   thumbs.innerHTML = '<span style="color:#888">Loading covers...</span>';
@@ -1095,7 +1101,7 @@ function render() {
         })()
       : "";
     const friendTag = friendTagFor(m.title);
-    const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.7rem">cover</div>`;
+    const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
     return `<div class="card">
       ${cover}
       <div class="card-body">
@@ -1323,20 +1329,6 @@ $("childAddBtn").onclick = () => {
 $("motherScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; $("barcodeStatus").innerHTML = "Scan tapped"; startScan("mother"); };
 $("childScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; $("barcodeStatus").innerHTML = "Scan tapped"; startScan("child"); };
 
-$("buyBtn").onclick = async () => {
-  const q = $("buyQuery").value.trim();
-  if (!q) return;
-  const box = $("buyResults");
-  try {
-    const res = await fetch(`https://www.omdbapi.com/?s=${encodeURIComponent(q)}&apikey=${OMDB_KEY}`);
-    const d = await res.json();
-    if (d.Search) {
-      box.innerHTML = d.Search.slice(0,8).map(m => `<div>${m.Title} (${m.Year})</div>`).join("");
-      box.classList.add("show");
-    } else box.classList.remove("show");
-  } catch(e) { box.classList.remove("show"); }
-};
-
 let friendInvTitles = JSON.parse(localStorage.getItem("md_friend_inv") || "[]");
 let friendRatings = JSON.parse(localStorage.getItem("md_friend_ratings") || "{}");
 let myWatchlist = JSON.parse(localStorage.getItem("md_my_watch") || "[]");
@@ -1367,7 +1359,7 @@ function showSettings() {
     { key: "md_boutique", label: "Boutique labels", data: boutiqueFlags },
     { key: "boutique-catalog", label: "Boutique catalog (barcode index)", data: boutiqueCatalog }
   ];
-  const box = $("sectionOut");
+  const box = $("settingsOut");
   const rows = stores.map(s => {
     const n = Array.isArray(s.data) ? s.data.length : Object.keys(s.data || {}).length;
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;">
@@ -1418,22 +1410,15 @@ function showSettings() {
 }
 function showSection(name) {
   currentSection = name;
-  $("watchControls").style.display = name === "watch" ? "block" : "none";
-  $("out").style.display = name === "inventory" ? "block" : "none";
-  $("q").style.display = name === "inventory" ? "block" : "none";
-  const box = $("sectionOut");
-  if (name === "inventory") { box.innerHTML = ""; render(); return; }
-  if (name === "rated") {
-    const mine = getAll().filter(m => m.publicRating);
-    const lines = mine.slice(0,60).map(m => {
-      const fr = friendRatings[normTitle(m.title)];
-      const name = ($("friendName") && $("friendName").value.trim()) || "Friend";
-      return `<div>${m.title} | IMDb: ${m.publicRating||"-"}${fr ? " | " + name + ": " + fr : ""}</div>`;
-    }).join("") || "<div style='color:#777'>No rated titles yet.</div>";
-    box.innerHTML = "<b>Rated</b><br>" + lines;
-    return;
-  }
+  ["inventory","add","watch","settings"].forEach(s => {
+    const sec = $("sec" + s.charAt(0).toUpperCase() + s.slice(1));
+    const btn = $("tab" + s.charAt(0).toUpperCase() + s.slice(1));
+    if (sec) sec.classList.toggle("active", s === name);
+    if (btn) btn.classList.toggle("active", s === name);
+  });
+  if (name === "inventory") render();
   if (name === "watch") renderWatch();
+  if (name === "settings") showSettings();
 }
 
 function renderWatch() {
@@ -1512,8 +1497,8 @@ loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch"
 loadListFile("friendWatchData", arr => { friendWatchlist = arr; }, "md_friend_watch");
 
 $("tabInventory").onclick = () => showSection("inventory");
-$("tabSettings").onclick = () => { currentSection = "settings"; $("watchControls").style.display = "none"; $("out").style.display = "none"; $("q").style.display = "none"; showSettings(); };
-$("tabRated").onclick = () => showSection("rated");
+$("tabAdd").onclick = () => showSection("add");
+$("tabSettings").onclick = () => showSection("settings");
 $("tabWatch").onclick = () => showSection("watch");
 $("watchModePersonal").onclick = () => { watchMode = "personal"; renderWatch(); };
 $("watchModeFriend").onclick = () => { watchMode = "friend"; renderWatch(); };
