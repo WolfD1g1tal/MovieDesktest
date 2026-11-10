@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.014</title>
+<title>Movie Desk 0.7.015</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -26,6 +26,7 @@
   .card-body { flex: 1; min-width: 0; }
   .card-title { font-weight: 500; font-size: 1.05rem; margin: 0 0 2px; cursor: pointer; }
   .card-meta { color: #aaa; font-size: 0.8rem; margin: 2px 0 6px; }
+  .card-added { color: #777; font-size: 0.72rem; margin: 0 0 6px; }
   .card-flags { display: flex; flex-wrap: wrap; gap: 6px; }
   .nav { display: flex; gap: 4px; margin: 8px 0; }
   .nav button { flex: 1; height: 40px; font-size: 0.85rem; }
@@ -83,7 +84,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.014</h1>
+  <h1>Movie Desk 0.7.015</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -552,6 +553,18 @@ function stampAdded() {
   if (changed) { saveColl(); saveManual(); }
 }
 stampAdded();
+
+function formatAdded(v) {
+  const n = Number(v);
+  if (!(n > 1e11)) return "";
+  const d = new Date(n);
+  if (isNaN(d.getTime())) return "";
+  try {
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch (e) {
+    return "";
+  }
+}
 
 function makeId(){
   return "id-" + Math.random().toString(36).slice(2, 10);
@@ -1281,11 +1294,14 @@ function render() {
     const badge = discBadge(bucket, fxMap);
     const discText = badge ? "" : (m.discType ? " | " + m.discType : "");
     const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
+    const added = formatAdded(m.addedAt);
+    const addedLine = added ? `<div class="card-added">Added ${added}</div>` : "";
     return `<div class="card">
       ${cover}
       <div class="card-body">
         <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
         <div class="card-meta">${m.year || ""}${discText}${m.edition ? " | " + m.edition : ""}</div>
+        ${addedLine}
         <div class="card-flags">
           ${badge}
           <span class="flag own">Owned</span>
