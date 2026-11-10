@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.021</title>
+<title>Movie Desk 0.7.022</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -85,7 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.021</h1>
+  <h1>Movie Desk 0.7.022</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -361,17 +361,29 @@ function ratingList(title) {
   if (v && v.rating) return [v];
   return [];
 }
+function movieYear(obj) {
+  const m = String((obj && (obj.year || obj.release)) || "").match(/(19|20)\d{2}/);
+  return m ? m[0] : "";
+}
 function ratingRecFor(m) {
   if (!m) return null;
   const id = String(m.imdbId || "").trim();
-  if (id && myRatingsById[id]) return myRatingsById[id];
+  const y = movieYear(m);
+  if (id) {
+    const rec = myRatingsById[id];
+    if (!rec) return null;
+    const ry = movieYear(rec);
+    if (y && ry && y !== ry) return null;
+    return rec;
+  }
   const list = ratingList(m.title);
   if (!list.length) return null;
-  const y = String(m.year || m.release || "").match(/(19|20)\d{2}/);
   if (y) {
-    const hits = list.filter(r => String(r.year || "") === y[0]);
-    if (hits.length) return hits[0];
+    const hits = list.filter(r => movieYear(r) === y);
+    return hits.length ? hits[0] : null;
   }
+  const years = [...new Set(list.map(movieYear).filter(Boolean))];
+  if (years.length > 1) return null;
   return list[0];
 }
 function formatRatingDate(s) {
@@ -1550,12 +1562,18 @@ function render() {
   }
   const fxMap = badgeFxMap();
   const watchIds = new Set();
-  const watchTitles = new Set();
+  const watchById = new Map();
+  const watchByTitle = new Map();
   (myWatchlist || []).forEach(w => {
     if (!w) return;
-    if (w.imdbId) watchIds.add(w.imdbId);
+    if (w.imdbId) {
+      watchIds.add(w.imdbId);
+      watchById.set(w.imdbId, w);
+    }
     const t = norm(watchTitle(w));
-    if (t) watchTitles.add(t);
+    if (!t) return;
+    if (!watchByTitle.has(t)) watchByTitle.set(t, []);
+    watchByTitle.get(t).push(w);
   });
   $("out").innerHTML = shown.map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
@@ -1582,7 +1600,27 @@ function render() {
     const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
     const added = formatAdded(m.addedAt);
     const addedLine = added ? `<div class="card-added">Added ${added}</div>` : "";
-    const onWatch = (m.imdbId && watchIds.has(m.imdbId)) || watchTitles.has(norm(m.title || ""));
+    const onWatch = (function() {
+      const id = String(m.imdbId || "").trim();
+      const y = movieYear(m);
+      if (id) {
+        const hit = watchById.get(id);
+        if (!hit) return false;
+        const wy = movieYear(hit);
+        if (y && wy && y !== wy) return false;
+        return true;
+      }
+      const list = watchByTitle.get(norm(m.title || "")) || [];
+      if (!list.length) return false;
+      if (y) {
+        const dated = list.filter(w => movieYear(w));
+        if (dated.length) return dated.some(w => movieYear(w) === y);
+        return false;
+      }
+      const years = [...new Set(list.map(movieYear).filter(Boolean))];
+      if (years.length > 1) return false;
+      return true;
+    })();
     const watchNote = onWatch ? '<span class="flag" style="background:#2a2048;color:#c4b5fd">Watchlist</span>' : "";
     return `<div class="card">
       ${cover}
