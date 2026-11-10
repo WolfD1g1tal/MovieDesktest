@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.017</title>
+<title>Movie Desk 0.7.018</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -40,6 +40,7 @@
   .filter-panel select { width: 100%; height: 40px; margin-top: 4px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; padding: 0 8px; }
   .section { display: none; }
   .section.active { display: block; }
+  .watch-row { padding: 8px 0; border-bottom: 1px solid #222; }
   .child-list { margin-top: 8px; margin-left: 24px; border-left: 2px solid #6a3a8a; padding-left: 10px; display: none; }
   .child-list.show { display: block; }
   .child-item { background: #2a1a3a; border: 1px solid #5a3a7a; border-radius: 6px; padding: 8px; margin: 4px 0; color: #d0a0e0; }
@@ -84,7 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.017</h1>
+  <h1>Movie Desk 0.7.018</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -179,6 +180,7 @@
         <button id="watchModeFriend" style="height:28px;padding:0 10px;font-size:0.75rem;">Friend</button>
         <button id="watchShared" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;">Shared</button>
       </div>
+      <input type="search" id="watchQ" placeholder="Find on watchlist" autocomplete="off">
     </div>
     <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
   </div>
@@ -278,11 +280,12 @@ let dbPromise = null;
 function openDb() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open("MovieDesk", 2);
+    const req = indexedDB.open("MovieDesk", 3);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains("ratings")) db.createObjectStore("ratings");
       if (!db.objectStoreNames.contains("boutique")) db.createObjectStore("boutique");
+      if (!db.objectStoreNames.contains("watch")) db.createObjectStore("watch");
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -1696,7 +1699,10 @@ $("childScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; 
 
 let friendInvTitles = JSON.parse(localStorage.getItem("md_friend_inv") || "[]");
 let friendRatings = JSON.parse(localStorage.getItem("md_friend_ratings") || "{}");
-let myWatchlist = JSON.parse(localStorage.getItem("md_my_watch") || "[]");
+let myWatchlist = [];
+try { myWatchlist = JSON.parse(localStorage.getItem("md_my_watch") || "[]"); } catch (e) { myWatchlist = []; }
+if (!Array.isArray(myWatchlist)) myWatchlist = [];
+myWatchlist = myWatchlist.map(watchItem);
 let friendWatchlist = JSON.parse(localStorage.getItem("md_friend_watch") || "[]");
 let currentSection = "inventory";
 let watchMode = "personal";
@@ -1763,7 +1769,7 @@ function showSettings() {
       if (key === "md_my_ratings") { myRatings = {}; myRatingsById = {}; idbClear("ratings"); }
       if (key === "md_friend_inv") friendInvTitles = [];
       if (key === "md_friend_ratings") friendRatings = {};
-      if (key === "md_my_watch") myWatchlist = [];
+      if (key === "md_my_watch") { myWatchlist = []; idbClear("watch"); }
       if (key === "md_friend_watch") friendWatchlist = [];
       if (key === "md_homo") Object.keys(homoFlags).forEach(k => delete homoFlags[k]);
       if (key === "md_boutique") Object.keys(boutiqueFlags).forEach(k => delete boutiqueFlags[k]);
@@ -1787,20 +1793,144 @@ function showSection(name) {
   if (name === "settings") showSettings();
 }
 
+function watchItem(x) {
+  if (x && typeof x === "object") return { title: x.title || "", imdbId: x.imdbId || "", year: x.year || "", type: x.type || "", imdbRating: x.imdbRating || "" };
+  return { title: String(x || ""), imdbId: "", year: "", type: "", imdbRating: "" };
+}
+function watchTitle(item) {
+  return item && typeof item === "object" ? (item.title || "") : String(item || "");
+}
+function escWatch(s) {
+  return String(s || "").replace(/[&<>"]/g, function(c) {
+    if (c === "&") return "&" + "amp;";
+    if (c === "<") return "&" + "lt;";
+    if (c === ">") return "&" + "gt;";
+    return "&" + "quot;";
+  });
+}
+function indexWatchCsv(text) {
+  const lines = String(text || "").split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { items: [], skipped: 0, empty: true, hasIds: false };
+  const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+  const titleIdx = header.findIndex(h => h === "title" || h === "name" || h === "movie");
+  const idIdx = header.findIndex(h => h === "const" || h === "imdb id" || h === "tconst");
+  const yearIdx = header.findIndex(h => h === "year");
+  const typeIdx = header.findIndex(h => h === "title type");
+  const ratingIdx = header.findIndex(h => h === "imdb rating");
+  const isImdb = titleIdx >= 0 && idIdx >= 0;
+  const items = [];
+  let skipped = 0;
+  if (!isImdb) {
+    const start = titleIdx >= 0 ? 1 : 0;
+    for (let i = start; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      const title = (titleIdx >= 0 ? (cols[titleIdx] || "") : (cols[0] || "")).trim();
+      if (title && title.toLowerCase() !== "title") items.push(watchItem({ title: title }));
+    }
+    return { items: items, skipped: 0, hasIds: false };
+  }
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    const type = typeIdx >= 0 ? (cols[typeIdx] || "").trim() : "";
+    if (type && RATING_SKIP[type.toLowerCase()]) { skipped++; continue; }
+    const title = (cols[titleIdx] || "").trim();
+    if (!title) continue;
+    items.push({
+      title: title,
+      imdbId: (cols[idIdx] || "").trim(),
+      year: yearIdx >= 0 ? (cols[yearIdx] || "").trim() : "",
+      type: type,
+      imdbRating: ratingIdx >= 0 ? (cols[ratingIdx] || "").trim() : ""
+    });
+  }
+  return { items: items, skipped: skipped, hasIds: true };
+}
+async function saveWatch() {
+  await idbPutMap("watch", { __list: myWatchlist });
+  localStorage.removeItem("md_my_watch");
+}
+async function loadWatchFromDb() {
+  try {
+    const raw = await idbGetAll("watch");
+    if (raw && Array.isArray(raw.__list)) {
+      myWatchlist = raw.__list.map(watchItem);
+      localStorage.removeItem("md_my_watch");
+    } else if (myWatchlist.length) {
+      await saveWatch();
+    }
+    if (currentSection === "watch") renderWatch();
+  } catch (e) {}
+}
+function watchOwnedSets() {
+  const titles = new Set();
+  const ids = new Set();
+  try {
+    getAll().forEach(m => {
+      if (m && m.title) titles.add(norm(m.title));
+      if (m && m.imdbId) ids.add(m.imdbId);
+    });
+  } catch (e) {}
+  return { titles: titles, ids: ids };
+}
+function watchRow(item, owned) {
+  const title = watchTitle(item);
+  const id = item && item.imdbId || "";
+  const year = item && item.year || "";
+  const rating = item && item.imdbRating || "";
+  const have = owned && ((id && owned.ids.has(id)) || owned.titles.has(norm(title)));
+  return '<div class="watch-row">' + escWatch(title)
+    + (year ? ' <span class="sub">(' + escWatch(year) + ')</span>' : '')
+    + (rating ? ' <span class="sub">IMDb ' + escWatch(rating) + '</span>' : '')
+    + (id ? ' <span class="sub">' + escWatch(id) + '</span>' : '')
+    + (have ? ' <span class="flag own">Owned</span>' : '')
+    + '</div>';
+}
 function renderWatch() {
   const box = $("sectionOut");
-  const list = watchMode === "friend" ? friendWatchlist : myWatchlist;
-  const label = watchMode === "friend" ? "Friend Watchlist" : "Personal Watchlist";
-  const lines = list.slice(0,60).map(t => `<div>${t}</div>`).join("") || "<div style='color:#777'>Empty.</div>";
-  box.innerHTML = `<b>${label}</b> (${list.length})<br>` + lines;
+  if (!box) return;
+  const personal = watchMode !== "friend";
+  const list = personal ? myWatchlist : friendWatchlist;
+  const label = personal ? "Personal Watchlist" : "Friend Watchlist";
+  const q = (($("watchQ") && $("watchQ").value) || "").trim().toLowerCase();
+  const filtered = q ? list.filter(item => {
+    const title = watchTitle(item).toLowerCase();
+    const id = (item && item.imdbId || "").toLowerCase();
+    return title.indexOf(q) !== -1 || id.indexOf(q) !== -1;
+  }) : list;
+  const cap = q ? 200 : 80;
+  const shown = filtered.slice(0, cap);
+  const owned = personal ? watchOwnedSets() : null;
+  const lines = shown.map(item => watchRow(item, owned)).join("") || "<div style='color:#777'>Empty.</div>";
+  const more = filtered.length > shown.length ? '<div class="sub">Showing ' + shown.length + ' of ' + filtered.length + '. Use the search box.</div>' : "";
+  box.innerHTML = '<b>' + label + '</b> (' + list.length + ')<br>' + more + lines;
 }
-
 function showSharedWatch() {
-  const mine = new Set(myWatchlist.map(normTitle));
-  const shared = friendWatchlist.filter(t => mine.has(normTitle(t)));
+  const mine = new Set(myWatchlist.map(t => normTitle(watchTitle(t))));
+  const shared = friendWatchlist.filter(t => mine.has(normTitle(watchTitle(t))));
   const box = $("sectionOut");
-  const lines = shared.slice(0,60).map(t => `<div>${t}</div>`).join("") || "<div style='color:#777'>No shared titles.</div>";
-  box.innerHTML = `<b>Shared Watchlist</b> (${shared.length})<br>` + lines;
+  const lines = shared.slice(0, 80).map(t => watchRow(t, null)).join("") || "<div style='color:#777'>No shared titles.</div>";
+  box.innerHTML = '<b>Shared Watchlist</b> (' + shared.length + ')<br>' + lines;
+}
+function loadMyWatch() {
+  const el = $("myWatch");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const result = indexWatchCsv(reader.result || "");
+      if (result.empty) { showPopup("Empty file."); return; }
+      myWatchlist = result.items;
+      await saveWatch();
+      const idNote = result.hasIds ? " IMDb ids kept." : " No IMDb ids in that file.";
+      const skipNote = result.skipped ? " Skipped " + result.skipped + " episodes, games, and podcasts." : "";
+      showPopup("Watchlist: " + result.items.length + "." + idNote + skipNote);
+      if (currentSection !== "watch") showSection("watch");
+      else renderWatch();
+    };
+    reader.readAsText(file);
+  };
 }
 
 function loadListFile(inputId, setter, storageKey) {
@@ -1858,7 +1988,8 @@ $("friendName").value = localStorage.getItem("md_friend_name") || "";
 
 loadListFile("friendInv", arr => { friendInvTitles = arr; }, "md_friend_inv");
 loadRatingsFile();
-loadListFile("myWatch", arr => { myWatchlist = arr; }, "md_my_watch");
+loadMyWatch();
+loadWatchFromDb();
 loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch");
 loadListFile("friendWatchData", arr => { friendWatchlist = arr; }, "md_friend_watch");
 
@@ -1936,6 +2067,7 @@ $("q").oninput = () => render();
 $("watchModePersonal").onclick = () => { watchMode = "personal"; renderWatch(); };
 $("watchModeFriend").onclick = () => { watchMode = "friend"; renderWatch(); };
 $("watchShared").onclick = showSharedWatch;
+if ($("watchQ")) $("watchQ").oninput = () => { watchMode = "personal"; renderWatch(); };
 function normTitle(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
 function parseFriendCsv(text) {
   const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
