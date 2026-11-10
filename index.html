@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.016</title>
+<title>Movie Desk 0.7.017</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -84,7 +84,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.016</h1>
+  <h1>Movie Desk 0.7.017</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -273,6 +273,7 @@ function stripBoutique(label) {
 }
 let ratingsById = {};
 let myRatings = {};
+let myRatingsById = {};
 let dbPromise = null;
 function openDb() {
   if (dbPromise) return dbPromise;
@@ -324,10 +325,111 @@ async function idbClear(store) {
 }
 async function loadRatingsFromDb() {
   try {
-    myRatings = await idbGetAll("ratings");
-    const n = Object.keys(myRatings).length;
-    if (n && $("counts")) $("counts").textContent = (getAll ? getAll().length : 0) + " titles | " + n + " ratings indexed";
+    const raw = await idbGetAll("ratings");
+    myRatings = {};
+    myRatingsById = {};
+    if (raw && raw.__v2 && raw.__v2.byTitle) {
+      myRatings = raw.__v2.byTitle || {};
+      myRatingsById = raw.__v2.byId || {};
+    } else {
+      Object.keys(raw || {}).forEach(k => {
+        const v = raw[k];
+        if (typeof v === "string" && v) myRatings[k] = [{ rating: v, date: "", imdbId: "", title: "", year: "", type: "" }];
+      });
+    }
+    if (typeof render === "function") render();
   } catch(e) {}
+}
+function ratingList(title) {
+  const v = myRatings[norm(title || "")];
+  if (!v) return [];
+  if (typeof v === "string") return [{ rating: v, date: "", imdbId: "", year: "", type: "", title: title || "" }];
+  if (Array.isArray(v)) return v;
+  if (v && v.rating) return [v];
+  return [];
+}
+function ratingRecFor(m) {
+  if (!m) return null;
+  const id = String(m.imdbId || "").trim();
+  if (id && myRatingsById[id]) return myRatingsById[id];
+  const list = ratingList(m.title);
+  if (!list.length) return null;
+  const y = String(m.year || m.release || "").match(/(19|20)\d{2}/);
+  if (y) {
+    const hits = list.filter(r => String(r.year || "") === y[0]);
+    if (hits.length) return hits[0];
+  }
+  return list[0];
+}
+function formatRatingDate(s) {
+  const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  return String(parseInt(m[2], 10)) + "/" + String(parseInt(m[3], 10)) + "/" + m[1];
+}
+function ratingBadge(m) {
+  const r = ratingRecFor(m);
+  if (!r || !r.rating) return "";
+  const date = formatRatingDate(r.date);
+  return '<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ' + r.rating + (date ? " · " + date : "") + '</span>';
+}
+const RATING_SKIP = { "tv episode": 1, "video game": 1, "podcast series": 1, "podcast episode": 1, "music video": 1 };
+function indexRatingsCsv(text) {
+  const lines = String(text || "").split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { kept: 0, skipped: 0, empty: true };
+  const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+  const col = name => header.findIndex(h => h === name);
+  const titleIdx = col("title");
+  const ratingIdx = col("your rating");
+  const dateIdx = col("date rated");
+  const idIdx = header.findIndex(h => h === "const" || h === "imdb id" || h === "tconst");
+  const yearIdx = col("year");
+  const typeIdx = col("title type");
+  const byId = {};
+  const byTitle = {};
+  let kept = 0, skipped = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    const type = typeIdx >= 0 ? (cols[typeIdx] || "").trim() : "";
+    if (type && RATING_SKIP[type.toLowerCase()]) { skipped++; continue; }
+    const title = (cols[titleIdx >= 0 ? titleIdx : 3] || "").trim();
+    const rating = (cols[ratingIdx >= 0 ? ratingIdx : 1] || "").trim();
+    if (!title || !rating) continue;
+    const imdbId = idIdx >= 0 ? (cols[idIdx] || "").trim() : "";
+    const rec = {
+      rating: rating,
+      date: dateIdx >= 0 ? (cols[dateIdx] || "").trim() : "",
+      imdbId: imdbId,
+      title: title,
+      year: yearIdx >= 0 ? (cols[yearIdx] || "").trim() : "",
+      type: type
+    };
+    const key = norm(title);
+    if (!byTitle[key]) byTitle[key] = [];
+    byTitle[key].push(rec);
+    if (imdbId) byId[imdbId] = rec;
+    kept++;
+  }
+  myRatings = byTitle;
+  myRatingsById = byId;
+  return { kept: kept, skipped: skipped };
+}
+function stampRatingIds() {
+  let n = 0;
+  getAll().forEach(m => {
+    if (!m || m.imdbId) return;
+    const list = ratingList(m.title);
+    const y = String(m.year || m.release || "").match(/(19|20)\d{2}/);
+    const exact = y ? list.filter(r => String(r.year || "") === y[0] && r.imdbId) : list.filter(r => r.imdbId);
+    if (exact.length !== 1) return;
+    m.imdbId = exact[0].imdbId;
+    n++;
+  });
+  if (n) { saveColl(); saveManual(); }
+  return n;
+}
+async function saveRatings() {
+  await idbPutMap("ratings", { __v2: { byId: myRatingsById, byTitle: myRatings } });
+  localStorage.removeItem("md_my_ratings");
 }
 function parseCsvLine(line) {
   const out = [];
@@ -349,23 +451,11 @@ function loadMyRatings() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const lines = (reader.result || "").split(/\r?\n/).filter(l => l.trim());
-      if (!lines.length) { showPopup("Empty file."); return; }
-      const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
-      const titleIdx = header.findIndex(h => h === "title");
-      const ratingIdx = header.findIndex(h => h === "your rating");
-      const imdbIdx = header.findIndex(h => h === "imdb rating");
-      const map = {};
-      for (let i = 1; i < lines.length; i++) {
-        const cols = parseCsvLine(lines[i]);
-        const title = (cols[titleIdx >= 0 ? titleIdx : 3] || "").trim();
-        const rating = (cols[ratingIdx >= 0 ? ratingIdx : 1] || "").trim();
-        if (title && rating) map[norm(title)] = rating;
-      }
-      myRatings = map;
-      await idbPutMap("ratings", myRatings);
-      localStorage.removeItem("md_my_ratings");
-      showPopup("Your ratings indexed: " + Object.keys(map).length);
+      const result = indexRatingsCsv(reader.result || "");
+      if (result.empty) { showPopup("Empty file."); return; }
+      const stamped = stampRatingIds();
+      await saveRatings();
+      showPopup("Ratings kept: " + result.kept + " (rating, date, IMDb id). Skipped " + result.skipped + " episodes, games, and podcasts." + (stamped ? " IMDb id stamped on " + stamped + " discs." : ""));
       render();
     };
     reader.readAsText(file);
@@ -1389,7 +1479,7 @@ function render() {
           ${boutNote}
           <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homo: ${isYes?"yes":"no"}</span>
           <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
-          ${myRatings[norm(m.title)] ? `<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ${myRatings[norm(m.title)]}</span>` : ""}
+          ${ratingBadge(m)}
         </div>
       </div>
     </div>`;
@@ -1625,7 +1715,7 @@ function showSettings() {
   const stores = [
     { key: "md_manual", label: "Manual titles (added in app)", data: manualTitles },
     { key: "md_coll", label: "Loaded collection", data: collection },
-    { key: "md_my_ratings", label: "Your IMDb ratings", data: myRatings },
+    { key: "md_my_ratings", label: "Your IMDb ratings", data: Object.keys(myRatingsById).length ? myRatingsById : myRatings },
     { key: "md_friend_inv", label: "Friend inventory", data: friendInvTitles },
     { key: "md_friend_ratings", label: "Friend ratings", data: friendRatings },
     { key: "md_my_watch", label: "Personal watchlist", data: myWatchlist },
@@ -1670,7 +1760,7 @@ function showSettings() {
       localStorage.removeItem(key);
       if (key === "md_manual") manualTitles = [];
       if (key === "md_coll") collection = [];
-      if (key === "md_my_ratings") { myRatings = {}; idbClear("ratings"); }
+      if (key === "md_my_ratings") { myRatings = {}; myRatingsById = {}; idbClear("ratings"); }
       if (key === "md_friend_inv") friendInvTitles = [];
       if (key === "md_friend_ratings") friendRatings = {};
       if (key === "md_my_watch") myWatchlist = [];
