@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.013</title>
+<title>Movie Desk 0.7.014</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -61,11 +61,29 @@
   .modal-box p { margin: 0 0 16px; white-space: pre-line; }
   .modal-box label { display: block; margin: 8px 0; font-size: 0.9rem; }
   .modal-box button { height: auto; background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; float: right; }
+
+  .disc-badge { display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden; height: 22px; min-width: 40px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; line-height: 1; vertical-align: middle; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 3px rgba(0,0,0,.38), 0 1px 2px rgba(0,0,0,.55); }
+  .disc-face { position: relative; z-index: 1; }
+  .disc-badge::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 48%; background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,0)); pointer-events: none; }
+  .kind-uhd { color: #3a2706; text-shadow: 0 1px 0 rgba(255,248,220,.75); background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 46%, rgba(70,40,0,.2) 100%), linear-gradient(108deg, #6e4e10 0%, #e7c56b 20%, #fff6d4 38%, #a97812 54%, #ffe7a3 72%, #5c430e 100%); }
+  .kind-blu { color: #f4f9ff; text-shadow: 0 1px 0 rgba(0,16,36,.6); background: linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 44%, rgba(0,12,28,.3) 100%), linear-gradient(108deg, #0b3a6c 0%, #8ec4f2 22%, #f7fbff 40%, #1a6aaf 56%, #d4ebff 74%, #082848 100%); }
+  .kind-dvd { color: #2c3136; text-shadow: 0 1px 0 rgba(255,255,255,.8); background: linear-gradient(180deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,0) 46%, rgba(0,0,0,.22) 100%), linear-gradient(108deg, #5e646b 0%, #d8dee5 20%, #ffffff 40%, #8e969e 55%, #f4f6f8 73%, #4e545a 100%); }
+  .disc-badge.fx-shimmer::after { content: ""; position: absolute; top: -30%; bottom: -30%; width: 38%; left: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent); transform: translateX(-180%); animation: badge-sweep 3.2s ease-in-out infinite; pointer-events: none; }
+  .disc-badge.fx-glow::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.7), transparent 68%); opacity: .2; animation: badge-glow 2.6s ease-in-out infinite; pointer-events: none; }
+  @keyframes badge-sweep { 0% { transform: translateX(-180%); } 100% { transform: translateX(430%); } }
+  @keyframes badge-glow { 0%, 100% { opacity: .12; } 50% { opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { .disc-badge.fx-shimmer::after, .disc-badge.fx-glow::after { animation: none; } }
+  .fx-group { margin: 0 0 14px; }
+  .fx-head { font-weight: 600; margin-bottom: 4px; }
+  .fx-choices { display: flex; flex-direction: column; gap: 6px; }
+  .fx-pick { height: auto; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 10px; background: #141414; border-radius: 10px; }
+  .fx-pick.on { border-color: #c9a227; background: #1c1a14; }
+  .fx-name { font-size: 0.85rem; line-height: 1.25; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.013</h1>
+  <h1>Movie Desk 0.7.014</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -165,6 +183,11 @@
   </div>
 
   <div id="secSettings" class="section">
+    <div class="nav" id="settingsNav">
+      <button type="button" id="setTabData" class="active">Library</button>
+      <button type="button" id="setTabLook">Appearance</button>
+    </div>
+    <div id="setData">
     <div>
       <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
       <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
@@ -180,6 +203,12 @@
       <label class="load">Friend Watchlist<input type="file" id="friendWatchData" accept=".csv,.txt"></label>
     </div>
     <div id="settingsOut" style="margin-top:12px;"></div>
+    </div>
+    <div id="setLook" style="display:none">
+      <div class="section-label">Disc badges</div>
+      <div class="sub" style="margin-bottom:10px">Gold for 4K. Blue chrome for Blu-ray. Silver chrome for DVD. Each one has three effects.</div>
+      <div id="badgeAppearance"></div>
+    </div>
   </div>
 </main>
 
@@ -1128,6 +1157,20 @@ function setCover(id, url) {
   render();
 }
 
+function badgeFxMap() {
+  const base = { uhd: "polish", blu: "polish", dvd: "polish" };
+  try { return Object.assign(base, JSON.parse(localStorage.getItem("md_badge_fx") || "{}")); }
+  catch (e) { return base; }
+}
+function saveBadgeFx(map) { localStorage.setItem("md_badge_fx", JSON.stringify(map)); }
+function discBadge(bucket, fxMap) {
+  if (bucket !== "uhd" && bucket !== "blu" && bucket !== "dvd") return "";
+  const fx = (fxMap && fxMap[bucket]) || "polish";
+  const text = bucket === "uhd" ? "4K" : bucket === "blu" ? "BLU" : "DVD";
+  const tip = bucket === "uhd" ? "4K" : bucket === "blu" ? "Blu-ray" : "DVD";
+  const safeFx = (fx === "shimmer" || fx === "glow") ? fx : "polish";
+  return '<span class="disc-badge kind-' + bucket + ' fx-' + safeFx + '" title="' + tip + '"><span class="disc-face">' + text + '</span></span>';
+}
 function discBucket(m) {
   const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
   const t = (m.title || "").toLowerCase();
@@ -1214,6 +1257,7 @@ function render() {
     $("filterBtn").textContent = nFilt ? "Filter (" + nFilt + ")" : "Filter";
     $("filterBtn").classList.toggle("on", nFilt > 0);
   }
+  const fxMap = badgeFxMap();
   $("out").innerHTML = shown.map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const isYes = !!homoFlags[key];
@@ -1233,13 +1277,17 @@ function render() {
         })()
       : "";
     const friendTag = friendTagFor(m.title);
+    const bucket = discBucket(m);
+    const badge = discBadge(bucket, fxMap);
+    const discText = badge ? "" : (m.discType ? " | " + m.discType : "");
     const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
     return `<div class="card">
       ${cover}
       <div class="card-body">
         <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
-        <div class="card-meta">${m.year || ""}${m.discType ? " | " + m.discType : ""}${m.edition ? " | " + m.edition : ""}</div>
+        <div class="card-meta">${m.year || ""}${discText}${m.edition ? " | " + m.edition : ""}</div>
         <div class="card-flags">
+          ${badge}
           <span class="flag own">Owned</span>
           ${childDrop}
           ${pkgNote}
@@ -1631,6 +1679,43 @@ loadListFile("friendWatchData", arr => { friendWatchlist = arr; }, "md_friend_wa
 $("tabInventory").onclick = () => showSection("inventory");
 $("tabAdd").onclick = () => showSection("add");
 $("tabSettings").onclick = () => showSection("settings");
+function renderBadgeSettings() {
+  const map = badgeFxMap();
+  const kinds = [["uhd","4K","Gold chrome","4K"],["blu","Blu-ray","Blue chrome","BLU"],["dvd","DVD","Silver chrome","DVD"]];
+  const fxs = [["polish","Polished","Still chrome"],["shimmer","Shimmer","Light sweeps across"],["glow","Glow","Soft pulse"]];
+  const box = $("badgeAppearance");
+  if (!box) return;
+  box.innerHTML = kinds.map(function(row) {
+    const k = row[0], name = row[1], metal = row[2], text = row[3];
+    const choices = fxs.map(function(fx) {
+      const on = map[k] === fx[0] ? " on" : "";
+      return '<button type="button" class="fx-pick' + on + '" data-kind="' + k + '" data-fx="' + fx[0] + '">'
+        + discBadge(k, (function(){ const o = {uhd:"polish",blu:"polish",dvd:"polish"}; o[k] = fx[0]; return o; })())
+        + '<span class="fx-name">' + fx[1] + '<br><span class="sub">' + fx[2] + '</span></span></button>';
+    }).join("");
+    return '<div class="fx-group"><div class="fx-head">' + name + ' <span class="sub">' + metal + '</span></div><div class="fx-choices">' + choices + '</div></div>';
+  }).join("");
+  box.querySelectorAll(".fx-pick").forEach(function(btn) {
+    btn.onclick = function() {
+      const m = badgeFxMap();
+      m[btn.dataset.kind] = btn.dataset.fx;
+      saveBadgeFx(m);
+      renderBadgeSettings();
+      render();
+    };
+  });
+}
+function showSettingsTab(which) {
+  const data = $("setData"), look = $("setLook");
+  if (data) data.style.display = which === "look" ? "none" : "block";
+  if (look) look.style.display = which === "look" ? "block" : "none";
+  if ($("setTabData")) $("setTabData").classList.toggle("active", which !== "look");
+  if ($("setTabLook")) $("setTabLook").classList.toggle("active", which === "look");
+  if (which === "look") renderBadgeSettings();
+}
+if ($("setTabData")) $("setTabData").onclick = () => showSettingsTab("data");
+if ($("setTabLook")) $("setTabLook").onclick = () => showSettingsTab("look");
+renderBadgeSettings();
 $("tabWatch").onclick = () => showSection("watch");
 $("q").oninput = () => render();
 (function initInventoryTools() {
