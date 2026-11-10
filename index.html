@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.020</title>
+<title>Movie Desk 0.7.021</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -85,7 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.020</h1>
+  <h1>Movie Desk 0.7.021</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -1549,6 +1549,14 @@ function render() {
     $("filterBtn").classList.toggle("on", nFilt > 0);
   }
   const fxMap = badgeFxMap();
+  const watchIds = new Set();
+  const watchTitles = new Set();
+  (myWatchlist || []).forEach(w => {
+    if (!w) return;
+    if (w.imdbId) watchIds.add(w.imdbId);
+    const t = norm(watchTitle(w));
+    if (t) watchTitles.add(t);
+  });
   $("out").innerHTML = shown.map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const isYes = !!homoFlags[key];
@@ -1574,6 +1582,8 @@ function render() {
     const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
     const added = formatAdded(m.addedAt);
     const addedLine = added ? `<div class="card-added">Added ${added}</div>` : "";
+    const onWatch = (m.imdbId && watchIds.has(m.imdbId)) || watchTitles.has(norm(m.title || ""));
+    const watchNote = onWatch ? '<span class="flag" style="background:#2a2048;color:#c4b5fd">Watchlist</span>' : "";
     return `<div class="card">
       ${cover}
       <div class="card-body">
@@ -1583,6 +1593,7 @@ function render() {
         <div class="card-flags">
           ${badge}
           <span class="flag own">Owned</span>
+          ${watchNote}
           ${childDrop}
           ${pkgNote}
           ${boutNote}
@@ -1965,6 +1976,7 @@ async function loadWatchFromDb() {
       await saveWatch();
     }
     if (currentSection === "watch") renderWatch();
+    if (currentSection === "inventory" && typeof render === "function") render();
   } catch (e) {}
 }
 function watchOwnedSets() {
@@ -2032,6 +2044,7 @@ function loadMyWatch() {
       const idNote = result.hasIds ? " IMDb ids kept." : " No IMDb ids in that file.";
       const skipNote = result.skipped ? " Skipped " + result.skipped + " episodes, games, and podcasts." : "";
       showPopup("Watchlist: " + result.items.length + "." + idNote + skipNote);
+      render();
       if (currentSection !== "watch") showSection("watch");
       else renderWatch();
     };
