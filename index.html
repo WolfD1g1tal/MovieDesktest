@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.019</title>
+<title>Movie Desk 0.7.020</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -85,7 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.019</h1>
+  <h1>Movie Desk 0.7.020</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -332,16 +332,25 @@ async function loadRatingsFromDb() {
     const raw = await idbGetAll("ratings");
     myRatings = {};
     myRatingsById = {};
-    if (raw && raw.__v2 && raw.__v2.byTitle) {
-      myRatings = raw.__v2.byTitle || {};
+    if (raw && raw.__v2 && raw.__v2.byId) {
       myRatingsById = raw.__v2.byId || {};
-    } else {
-      Object.keys(raw || {}).forEach(k => {
-        const v = raw[k];
-        if (typeof v === "string" && v) myRatings[k] = [{ rating: v, date: "", imdbId: "", title: "", year: "", type: "" }];
-      });
+      myRatings = raw.__v2.byTitle || {};
     }
+    Object.keys(raw || {}).forEach(k => {
+      if (k === "__v2" || k === "__meta") return;
+      const v = raw[k];
+      if (v && typeof v === "object" && v.imdbId) {
+        myRatingsById[v.imdbId] = v;
+        const key = norm(v.title || "");
+        if (!key) return;
+        if (!myRatings[key]) myRatings[key] = [];
+        if (!myRatings[key].some(r => r.imdbId === v.imdbId)) myRatings[key].push(v);
+      } else if (typeof v === "string" && v) {
+        myRatings[k] = [{ rating: v, date: "", imdbId: "", title: "", year: "", type: "" }];
+      }
+    });
     if (typeof render === "function") render();
+    if (typeof currentSection !== "undefined" && currentSection === "settings" && typeof showSettings === "function") showSettings();
   } catch(e) {}
 }
 function ratingList(title) {
@@ -432,7 +441,17 @@ function stampRatingIds() {
   return n;
 }
 async function saveRatings() {
-  await idbPutMap("ratings", { __v2: { byId: myRatingsById, byTitle: myRatings } });
+  const db = await openDb();
+  const ids = Object.keys(myRatingsById);
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("ratings", "readwrite");
+    const os = tx.objectStore("ratings");
+    os.clear();
+    ids.forEach(id => os.put(myRatingsById[id], id));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Could not save ratings"));
+    tx.onabort = () => reject(tx.error || new Error("Could not save ratings"));
+  });
   localStorage.removeItem("md_my_ratings");
 }
 function parseCsvLine(line) {
@@ -455,12 +474,17 @@ function loadMyRatings() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = async () => {
-      const result = indexRatingsCsv(reader.result || "");
-      if (result.empty) { showPopup("Empty file."); return; }
-      const stamped = stampRatingIds();
-      await saveRatings();
-      showPopup("Ratings kept: " + result.kept + " (rating, date, IMDb id). Skipped " + result.skipped + " episodes, games, and podcasts." + (stamped ? " IMDb id stamped on " + stamped + " discs." : ""));
-      render();
+      try {
+        const result = indexRatingsCsv(reader.result || "");
+        if (result.empty) { showPopup("Empty file."); return; }
+        const stamped = stampRatingIds();
+        await saveRatings();
+        showPopup("Ratings kept: " + result.kept + ". Stored " + Object.keys(myRatingsById).length + ". Skipped " + result.skipped + " episodes, games, and podcasts." + (stamped ? " IMDb id stamped on " + stamped + " discs." : ""));
+        render();
+        if (currentSection === "settings") showSettings();
+      } catch (err) {
+        showPopup("Ratings did not save: " + (err && err.message ? err.message : err));
+      }
     };
     reader.readAsText(file);
   };
@@ -1803,7 +1827,7 @@ function showSettings() {
   const stores = [
     { key: "md_manual", label: "Manual titles (added in app)", data: manualTitles },
     { key: "md_coll", label: "Loaded collection", data: collection },
-    { key: "md_my_ratings", label: "Your IMDb ratings", data: Object.keys(myRatingsById).length ? myRatingsById : myRatings },
+    { key: "md_my_ratings", label: "Your IMDb ratings", data: myRatingsById, count: Object.keys(myRatingsById).length || Object.keys(myRatings).length },
     { key: "md_friend_inv", label: "Friend inventory", data: friendInvTitles },
     { key: "md_friend_ratings", label: "Friend ratings", data: friendRatings },
     { key: "md_my_watch", label: "Personal watchlist", data: myWatchlist },
@@ -1814,7 +1838,7 @@ function showSettings() {
   ];
   const box = $("settingsOut");
   const rows = stores.map(s => {
-    const n = Array.isArray(s.data) ? s.data.length : Object.keys(s.data || {}).length;
+    const n = typeof s.count === "number" ? s.count : (Array.isArray(s.data) ? s.data.length : Object.keys(s.data || {}).length);
     return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;">
       <div>${s.label}<br><span style="color:#888;font-size:0.75rem">${s.key} | ${n} items</span></div>
       <button data-clear="${s.key}" style="height:28px;padding:0 10px;font-size:0.75rem;background:#3a1a1a;color:#f88;">Clear</button>
