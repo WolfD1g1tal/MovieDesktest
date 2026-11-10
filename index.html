@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.018</title>
+<title>Movie Desk 0.7.019</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -85,7 +85,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.018</h1>
+  <h1>Movie Desk 0.7.019</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -197,6 +197,7 @@
       <label class="load">Load Boutique Catalog<input type="file" id="fboutique" accept=".csv"></label>
       <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
       <button id="exportBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;border-radius:6px;">Export Library</button>
+      <button id="refreshImdbBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a2a3a;color:#8ab4f8;border:1px solid #2a4a6a;border-radius:6px;">Refresh IMDb Ratings</button>
     </div>
     <div class="section-label">Friend Data</div>
     <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
@@ -796,6 +797,87 @@ async function refineWithOMDB(rawTitle) {
   } catch (e) {}
   return { title: cleaned || rawTitle, imdbId: "", rating: "", refined: false, discType: detectDiscType(rawTitle) };
 }
+
+let refreshBusy = false;
+async function omdbById(id) {
+  const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(id) + "&apikey=" + OMDB_KEY);
+  return await res.json();
+}
+async function refreshPublicRatings() {
+  if (refreshBusy) return;
+  refreshBusy = true;
+  const btn = $("refreshImdbBtn");
+  if (btn) btn.disabled = true;
+  const out = $("settingsOut");
+  try {
+    const groups = {};
+    let noId = 0;
+    getAll().forEach(m => {
+      const id = String(m.imdbId || "").trim();
+      if (!/^tt\d+$/.test(id)) { noId++; return; }
+      if (!groups[id]) groups[id] = [];
+      groups[id].push(m);
+    });
+    const ids = Object.keys(groups);
+    if (!ids.length) {
+      showPopup("No IMDb ids on your discs. Add from the title list, or load your ratings CSV, then try again.");
+      return;
+    }
+    const scores = {};
+    let failed = 0;
+    let stopped = "";
+    const queue = ids.slice();
+    let done = 0;
+    async function worker() {
+      while (queue.length && !stopped) {
+        const id = queue.shift();
+        try {
+          const d = await omdbById(id);
+          done++;
+          if (out) out.textContent = "Refreshing public IMDb ratings " + done + " / " + ids.length;
+          if (d && d.Response === "False") {
+            if (/limit/i.test(d.Error || "")) { stopped = "limit"; return; }
+            failed++;
+            continue;
+          }
+          const rating = d && d.imdbRating && d.imdbRating !== "N/A" ? String(d.imdbRating) : "";
+          if (!rating) failed++;
+          else scores[id] = rating;
+        } catch (e) {
+          done++;
+          failed++;
+        }
+      }
+    }
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    let changed = 0, same = 0;
+    Object.keys(scores).forEach(id => {
+      groups[id].forEach(m => {
+        if (String(m.publicRating || "") === scores[id]) same++;
+        else { m.publicRating = scores[id]; changed++; }
+      });
+    });
+    if (changed) { saveColl(); saveManual(); }
+    let watchChanged = 0;
+    myWatchlist.forEach(w => {
+      if (!w || !w.imdbId || !scores[w.imdbId]) return;
+      if (String(w.imdbRating || "") === scores[w.imdbId]) return;
+      w.imdbRating = scores[w.imdbId];
+      watchChanged++;
+    });
+    if (watchChanged) await saveWatch();
+    if (currentSection === "inventory") render();
+    if (currentSection === "watch") renderWatch();
+    const left = stopped === "limit" ? " Daily lookup limit hit. Tap again tomorrow for the rest." : "";
+    const none = noId ? " " + noId + " discs have no IMDb id, so they were skipped." : "";
+    showPopup("Public IMDb ratings refreshed. Updated " + changed + ". Already current " + same + ". No score " + failed + "." + none + left);
+    if (out) out.textContent = "";
+  } finally {
+    refreshBusy = false;
+    if (btn) btn.disabled = false;
+  }
+}
+$("refreshImdbBtn").onclick = () => { refreshPublicRatings(); };
 
 async function lookupBarcode(code) {
   const clean = (code || "").replace(/\D/g, "");
