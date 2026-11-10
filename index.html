@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.015</title>
+<title>Movie Desk 0.7.016</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -84,7 +84,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.015</h1>
+  <h1>Movie Desk 0.7.016</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -249,6 +249,7 @@ function closeModal(){
   document.body.style.overflow = "";
 }
 const OMDB_KEY = "8d83ba51";
+const TMDB_KEY = "29c3cb82fa06b97815b502bb02cee215";
 const UPCMDB_KEY = "d207a24928dc0f20f056afe5cb887437";
 const UPCDATABASE_KEY = "7451A8510DEE05A60529AAE24745905D";
 const $ = id => document.getElementById(id);
@@ -412,20 +413,29 @@ function loadBoutiqueCsv() {
       const cIdx = ["coverurl","cover","cover_url","image","source_url","sourceurl"].map(idx).find(i => i >= 0);
       if (bIdx == null || bIdx < 0) { showPopup("Need a barcode / upc / ean column."); return; }
       const map = {};
+      let coverCount = 0;
       for (let i = 1; i < lines.length; i++) {
         const cols = parseCsvLine(lines[i]);
         const bc = (cols[bIdx] || "").replace(/\D/g, "");
         if (!bc) continue;
-        map[bc] = {
-          title: (tIdx >= 0 ? cols[tIdx] : "") || "",
-          edition: (eIdx >= 0 ? cols[eIdx] : "") || "",
-          label: (lIdx >= 0 ? cols[lIdx] : "") || "",
-          coverUrl: (cIdx >= 0 ? cols[cIdx] : "") || ""
-        };
+        const title = (tIdx >= 0 ? cols[tIdx] : "") || "";
+        const edition = (eIdx >= 0 ? cols[eIdx] : "") || "";
+        const label = (lIdx >= 0 ? cols[lIdx] : "") || "";
+        const cover = (cIdx >= 0 ? cols[cIdx] : "") || "";
+        if (!map[bc]) map[bc] = { title: title, edition: edition, label: label, coverUrl: cover, covers: [] };
+        const rec = map[bc];
+        if (!rec.title && title) rec.title = title;
+        if (!rec.label && label) rec.label = label;
+        if (!rec.edition && edition) rec.edition = edition;
+        if (cover && !rec.covers.some(c => c.url === cover)) {
+          rec.covers.push({ url: cover, label: label || "Boutique", edition: edition || "" });
+          coverCount++;
+        }
+        if (!rec.coverUrl && cover) rec.coverUrl = cover;
       }
       boutiqueCatalog = map;
       await idbPutMap("boutique", boutiqueCatalog);
-      showPopup("Boutique catalog indexed: " + Object.keys(map).length);
+      showPopup("Boutique catalog: " + Object.keys(map).length + " barcodes, " + coverCount + " covers");
     };
     reader.readAsText(file);
   };
@@ -995,36 +1005,81 @@ async function omdbSuggest(query, box) {
 }
 
 
+async function tmdbPosters(m) {
+  if (!TMDB_KEY || !m) return [];
+  let kind = "movie";
+  let id = null;
+  try {
+    if (m.imdbId) {
+      const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(m.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
+      const d = await res.json();
+      if (d.movie_results && d.movie_results[0]) { id = d.movie_results[0].id; kind = "movie"; }
+      else if (d.tv_results && d.tv_results[0]) { id = d.tv_results[0].id; kind = "tv"; }
+    }
+    if (!id && m.title) {
+      const y = String(m.year || m.release || "").match(/(19|20)\d{2}/);
+      let url = "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(m.title) + "&api_key=" + TMDB_KEY;
+      if (y) url += "&year=" + y[0];
+      const res = await fetch(url);
+      const d = await res.json();
+      if (d.results && d.results[0]) { id = d.results[0].id; kind = "movie"; }
+      else {
+        const res2 = await fetch("https://api.themoviedb.org/3/search/tv?query=" + encodeURIComponent(m.title) + "&api_key=" + TMDB_KEY);
+        const d2 = await res2.json();
+        if (d2.results && d2.results[0]) { id = d2.results[0].id; kind = "tv"; }
+      }
+    }
+    if (!id) return [];
+    const res = await fetch("https://api.themoviedb.org/3/" + kind + "/" + id + "/images?api_key=" + TMDB_KEY);
+    const d = await res.json();
+    const posters = (d.posters || []).slice();
+    const rank = p => p.iso_639_1 === "en" ? 0 : (p.iso_639_1 == null || p.iso_639_1 === "") ? 1 : 2;
+    posters.sort((a, b) => {
+      const dlt = rank(a) - rank(b);
+      if (dlt) return dlt;
+      return (b.vote_average || 0) - (a.vote_average || 0);
+    });
+    return posters.filter(p => p.file_path).map(p => ({
+      url: "https://image.tmdb.org/t/p/w780" + p.file_path,
+      thumb: "https://image.tmdb.org/t/p/w185" + p.file_path,
+      label: (p.iso_639_1 == null || p.iso_639_1 === "") ? "TMDB · textless" : ("TMDB · " + p.iso_639_1)
+    }));
+  } catch (e) { return []; }
+}
+
+function boutiqueCoverList(row) {
+  if (!row) return [];
+  if (Array.isArray(row.covers) && row.covers.length) return row.covers.filter(c => c && c.url);
+  if (row.coverUrl) return [{ url: row.coverUrl, label: row.label || "Boutique", edition: row.edition || "" }];
+  return [];
+}
+
 async function gatherCovers(m) {
   const urls = [];
   const seen = new Set();
-  function add(url, label) {
+  function add(url, label, source, thumb) {
     if (!url || url === "N/A" || seen.has(url)) return;
     seen.add(url);
-    urls.push({ url, label });
+    urls.push({ url, label, source: source || "other", thumb: thumb || url });
   }
   const bout = lookupBoutique(m.barcode);
-  if (bout && bout.coverUrl) add(bout.coverUrl, "Boutique");
-  if (m.coverUrl) add(m.coverUrl, "Current");
-  if (OMDB_KEY) {
-    if (m.imdbId) {
-      try {
-        const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(m.imdbId) + "&apikey=" + OMDB_KEY);
-        const d = await res.json();
-        if (d && d.Poster) add(d.Poster, "OMDB");
-      } catch(e) {}
-    }
-    if (m.title) {
-      try {
-        const res = await fetch("https://www.omdbapi.com/?s=" + encodeURIComponent(m.title) + "&apikey=" + OMDB_KEY);
-        const d = await res.json();
-        if (d && d.Search) {
-          for (const s of d.Search.slice(0, 4)) {
-            if (s.Poster) add(s.Poster, "OMDB search");
-          }
-        }
-      } catch(e) {}
-    }
+  boutiqueCoverList(bout).forEach(c => {
+    const bits = ["Boutique"];
+    if (c.label && c.label !== "Boutique") bits.push(c.label);
+    if (c.edition) bits.push(c.edition);
+    add(c.url, bits.join(" · "), "boutique");
+  });
+  if (m.coverUrl) add(m.coverUrl, "Current", "other");
+  try {
+    const posters = await tmdbPosters(m);
+    posters.forEach(p => add(p.url, p.label, "tmdb", p.thumb));
+  } catch (e) {}
+  if (OMDB_KEY && m.imdbId) {
+    try {
+      const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(m.imdbId) + "&apikey=" + OMDB_KEY);
+      const d = await res.json();
+      if (d && d.Poster) add(d.Poster, "OMDB", "other");
+    } catch (e) {}
   }
   if (m.barcode) {
     try {
@@ -1032,9 +1087,9 @@ async function gatherCovers(m) {
       const d = await res.json();
       const item = d.items && d.items[0];
       if (item && item.images) {
-        for (const img of item.images.slice(0, 3)) add(img, "UPC");
+        for (const img of item.images.slice(0, 3)) add(img, "UPC", "other");
       }
-    } catch(e) {}
+    } catch (e) {}
   }
   return urls;
 }
@@ -1049,14 +1104,38 @@ async function pickCover(id) {
   selectedCoverUrl = null;
   const box = document.getElementById("coverPicker");
   if (!box) return;
-  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><div style="display:flex;gap:4px"><button type="button" id="coverCam" title="Take photo" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" id="coverFile" title="From gallery" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + (m.title||"") + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button><button id="coverCropSel" type="button" disabled style="flex:1;height:40px;background:#2a2a2a;color:#eee;border:none;border-radius:8px">Crop selected</button></div></div>';
+  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><div style="display:flex;gap:4px"><button type="button" id="coverCam" title="Take photo" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" id="coverFile" title="From gallery" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + (m.title||"") + '</p><div id="coverFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div><p style="margin:0 0 8px;font-size:0.7rem;color:#666">Posters from TMDB. Not endorsed by TMDB.</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button><button id="coverCropSel" type="button" disabled style="flex:1;height:40px;background:#2a2a2a;color:#eee;border:none;border-radius:8px">Crop selected</button></div></div>';
   box.style.display = "flex";
   const thumbs = document.getElementById("coverThumbs");
   thumbs.innerHTML = '<span style="color:#888">Loading covers...</span>';
   const urls = await gatherCovers(m);
-  function renderThumbs() {
-    thumbs.innerHTML = urls.map((u, i) => '<div style="text-align:center"><img src="' + u.url.replace(/"/g,"") + '" data-url="' + u.url.replace(/"/g,"") + '" data-idx="' + i + '" style="width:90px;height:135px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid #333"><div style="font-size:0.7rem;color:#888;margin-top:2px">' + u.label + '</div></div>').join("") || '<span style="color:#888">No covers found. Add URL, camera, or file.</span>';
+  let coverFilter = "all";
+  function renderFilters() {
+    const el = document.getElementById("coverFilters");
+    if (!el) return;
+    const nB = urls.filter(u => u.source === "boutique").length;
+    const nT = urls.filter(u => u.source === "tmdb").length;
+    const chips = [["all", "All " + urls.length], ["boutique", "Boutique " + nB], ["tmdb", "TMDB " + nT]];
+    el.innerHTML = chips.map(c => '<button type="button" data-filter="' + c[0] + '" style="height:28px;padding:0 10px;border-radius:14px;border:1px solid ' + (coverFilter === c[0] ? "#6af" : "#333") + ';background:' + (coverFilter === c[0] ? "#1a2a3a" : "#111") + ';color:#eee;font-size:0.75rem">' + c[1] + '</button>').join("");
   }
+  function renderThumbs() {
+    renderFilters();
+    const list = urls.filter(u => coverFilter === "all" || u.source === coverFilter);
+    thumbs.innerHTML = list.map(u => {
+      const src = (u.thumb || u.url).replace(/"/g, "");
+      const full = String(u.url).replace(/"/g, "");
+      const lab = String(u.label || "").replace(/[<>]/g, "");
+      return '<div style="text-align:center;width:90px"><img loading="lazy" src="' + src + '" data-url="' + full + '" style="width:90px;height:135px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid #333;background:#111"><div style="font-size:0.7rem;color:#888;margin-top:2px;line-height:1.2">' + lab + '</div></div>';
+    }).join("") || '<span style="color:#888">No covers in this list. Add URL, camera, or file.</span>';
+    if (selectedCoverUrl) document.querySelectorAll("#coverThumbs img").forEach(im => { im.style.borderColor = im.dataset.url === selectedCoverUrl ? "#6af" : "#333"; });
+  }
+  const filters = document.getElementById("coverFilters");
+  if (filters) filters.onclick = function(e) {
+    const b = e.target.closest("button[data-filter]");
+    if (!b) return;
+    coverFilter = b.dataset.filter;
+    renderThumbs();
+  };
   renderThumbs();
   function selectUrl(url) {
     selectedCoverUrl = url;
@@ -1566,6 +1645,7 @@ function showSettings() {
   const popupOff = localStorage.getItem("md_popup_off") === "1" || sessionStorage.getItem("md_popup_off") === "1";
   box.innerHTML = `<b>Settings - stored in this browser</b>
     <div style="color:#888;font-size:0.8rem;margin:6px 0 10px;">Nothing is saved to a folder until you tap Export Library. Exported CSVs go to your phone/browser Downloads folder.</div>
+    <div style="color:#888;font-size:0.75rem;margin:0 0 10px;">This product uses the TMDB API but is not endorsed or certified by TMDB.</div>
     <div style="padding:8px 0;border-bottom:1px solid #2a2a2a;">
       <label style="display:flex;align-items:center;gap:8px;">
         <input type="checkbox" id="settingsPopup" ${popupOff ? "" : "checked"}>
