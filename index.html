@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.012</title>
+<title>Movie Desk 0.7.013</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -30,6 +30,13 @@
   .nav { display: flex; gap: 4px; margin: 8px 0; }
   .nav button { flex: 1; height: 40px; font-size: 0.85rem; }
   .nav button.active { background: #333; border-color: #666; }
+  .tool-row { display: flex; gap: 8px; margin: 8px 0; }
+  .tool-row select { flex: 1; height: 40px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; padding: 0 8px; }
+  #filterBtn.on { border-color: #8ab4f8; color: #8ab4f8; }
+  .filter-panel { display: none; background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .filter-panel.open { display: block; }
+  .filter-panel label { display: block; color: #aaa; font-size: 0.8rem; margin: 6px 0; }
+  .filter-panel select { width: 100%; height: 40px; margin-top: 4px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; padding: 0 8px; }
   .section { display: none; }
   .section.active { display: block; }
   .child-list { margin-top: 8px; margin-left: 24px; border-left: 2px solid #6a3a8a; padding-left: 10px; display: none; }
@@ -58,7 +65,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.012</h1>
+  <h1>Movie Desk 0.7.013</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -71,6 +78,45 @@
 
   <div id="secInventory" class="section active">
     <input type="search" id="q" placeholder="Search your titles...">
+    <div class="tool-row">
+      <button type="button" id="filterBtn">Filter</button>
+      <select id="sortSel" aria-label="Sort">
+        <option value="added-new">Newest added</option>
+        <option value="added-old">Oldest added</option>
+        <option value="az">A–Z</option>
+        <option value="za">Z–A</option>
+        <option value="imdb">IMDb</option>
+        <option value="friend">Friend IMDb</option>
+        <option value="rel-new">Release newest</option>
+        <option value="rel-old">Release oldest</option>
+      </select>
+    </div>
+    <div id="filterPanel" class="filter-panel">
+      <label>Disc
+        <select id="filterDisc">
+          <option value="">All</option>
+          <option value="uhd">4K</option>
+          <option value="blu">Blu-ray</option>
+          <option value="dvd">DVD</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Boutique
+        <select id="filterBout">
+          <option value="">All</option>
+          <option value="yes">Has boutique</option>
+          <option value="no">No boutique</option>
+        </select>
+      </label>
+      <label>Homo scenes
+        <select id="filterHomo">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </label>
+      <button type="button" id="filterClear" style="height:36px;margin-top:8px;">Clear filters</button>
+    </div>
     <div id="out"></div>
   </div>
 
@@ -465,6 +511,19 @@ function fixMissingIds(){
 }
 fixMissingIds();
 
+function stampAdded() {
+  let n = 1;
+  let changed = false;
+  collection.forEach(m => {
+    if (!m.addedAt) { m.addedAt = n++; changed = true; }
+  });
+  for (let i = manualTitles.length - 1; i >= 0; i--) {
+    if (!manualTitles[i].addedAt) { manualTitles[i].addedAt = n++; changed = true; }
+  }
+  if (changed) { saveColl(); saveManual(); }
+}
+stampAdded();
+
 function makeId(){
   return "id-" + Math.random().toString(36).slice(2, 10);
 }
@@ -506,7 +565,8 @@ function makeMother(title, extra={}){
     genres: extra.genres || "",
     director: extra.director || "",
     composer: extra.composer || "",
-    cinematographer: extra.cinematographer || ""
+    cinematographer: extra.cinematographer || "",
+    addedAt: extra.addedAt || Date.now()
   };
 }
 function makeChild(title, motherId, extra={}){
@@ -535,7 +595,8 @@ function makeChild(title, motherId, extra={}){
     genres: extra.genres || "",
     director: extra.director || "",
     composer: extra.composer || "",
-    cinematographer: extra.cinematographer || ""
+    cinematographer: extra.cinematographer || "",
+    addedAt: extra.addedAt || Date.now()
   };
 }
 
@@ -1067,6 +1128,57 @@ function setCover(id, url) {
   render();
 }
 
+function discBucket(m) {
+  const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
+  const t = (m.title || "").toLowerCase();
+  if (/ultra|\buhd\b|\b4k\b/.test(d) || /\b4k\b|\buhd\b|ultra hd/.test(t)) return "uhd";
+  if (/blu/.test(d)) return "blu";
+  if (/\bdvd\b/.test(d)) return "dvd";
+  return "other";
+}
+function numRating(v) {
+  const n = parseFloat(String(v || "").replace(/[^\d.]/g, ""));
+  return isNaN(n) ? -1 : n;
+}
+function releaseTime(m) {
+  const raw = String(m.release || m.year || "").trim();
+  if (!raw) return 0;
+  const parsed = Date.parse(raw);
+  if (!isNaN(parsed)) return parsed;
+  const y = raw.match(/(19|20)\d{2}/);
+  return y ? Date.UTC(parseInt(y[0], 10), 0, 1) : 0;
+}
+function homoKey(m) {
+  return m.title + "|" + (m.barcode || "") + "|" + (m.edition || "");
+}
+function activeFilterCount() {
+  let n = 0;
+  if ($("filterDisc") && $("filterDisc").value) n++;
+  if ($("filterBout") && $("filterBout").value) n++;
+  if ($("filterHomo") && $("filterHomo").value) n++;
+  return n;
+}
+function sortList(list, mode) {
+  const arr = list.slice();
+  const titleKey = m => (m.title || "").toLowerCase();
+  arr.sort((a, b) => {
+    if (mode === "az") return titleKey(a).localeCompare(titleKey(b));
+    if (mode === "za") return titleKey(b).localeCompare(titleKey(a));
+    if (mode === "imdb") return numRating(b.publicRating) - numRating(a.publicRating);
+    if (mode === "friend") return numRating(friendRatings[norm(b.title)]) - numRating(friendRatings[norm(a.title)]);
+    if (mode === "added-old") return (a.addedAt || 0) - (b.addedAt || 0);
+    if (mode === "rel-new" || mode === "rel-old") {
+      const ra = releaseTime(a), rb = releaseTime(b);
+      if (!ra && !rb) return 0;
+      if (!ra) return 1;
+      if (!rb) return -1;
+      return mode === "rel-new" ? rb - ra : ra - rb;
+    }
+    return (b.addedAt || 0) - (a.addedAt || 0);
+  });
+  return arr;
+}
+
 function render() {
   const q = norm($("q").value);
   let all = getAll();
@@ -1081,8 +1193,28 @@ function render() {
     });
     all = all.filter(m => ids.has(m.id));
   }
-  $("counts").textContent = `${all.length} shown / ${getAll().length} total`;
-  $("out").innerHTML = all.slice(0,80).map(m => {
+  const disc = $("filterDisc") ? $("filterDisc").value : "";
+  const bout = $("filterBout") ? $("filterBout").value : "";
+  const homo = $("filterHomo") ? $("filterHomo").value : "";
+  if (disc) all = all.filter(m => discBucket(m) === disc);
+  if (bout === "yes") all = all.filter(m => !!(boutiqueFlags[m.id] || m.boutiqueLabel));
+  if (bout === "no") all = all.filter(m => !(boutiqueFlags[m.id] || m.boutiqueLabel));
+  if (homo === "yes") all = all.filter(m => !!homoFlags[homoKey(m)]);
+  if (homo === "no") all = all.filter(m => !homoFlags[homoKey(m)]);
+  const mode = ($("sortSel") && $("sortSel").value) || "added-new";
+  all = sortList(all, mode);
+  const cap = 200;
+  const matched = all.length;
+  const shown = all.slice(0, cap);
+  $("counts").textContent = matched > shown.length
+    ? `${shown.length} of ${matched} shown / ${getAll().length} total`
+    : `${shown.length} shown / ${getAll().length} total`;
+  const nFilt = activeFilterCount();
+  if ($("filterBtn")) {
+    $("filterBtn").textContent = nFilt ? "Filter (" + nFilt + ")" : "Filter";
+    $("filterBtn").classList.toggle("on", nFilt > 0);
+  }
+  $("out").innerHTML = shown.map(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const isYes = !!homoFlags[key];
     const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
@@ -1500,6 +1632,36 @@ $("tabInventory").onclick = () => showSection("inventory");
 $("tabAdd").onclick = () => showSection("add");
 $("tabSettings").onclick = () => showSection("settings");
 $("tabWatch").onclick = () => showSection("watch");
+$("q").oninput = () => render();
+(function initInventoryTools() {
+  const savedSort = localStorage.getItem("md_sort") || "added-new";
+  if ($("sortSel")) $("sortSel").value = savedSort;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("md_filter") || "{}"); } catch (e) {}
+  if ($("filterDisc")) $("filterDisc").value = saved.disc || "";
+  if ($("filterBout")) $("filterBout").value = saved.bout || "";
+  if ($("filterHomo")) $("filterHomo").value = saved.homo || "";
+  function saveFilter() {
+    localStorage.setItem("md_filter", JSON.stringify({
+      disc: $("filterDisc").value,
+      bout: $("filterBout").value,
+      homo: $("filterHomo").value
+    }));
+    render();
+  }
+  $("filterBtn").onclick = () => $("filterPanel").classList.toggle("open");
+  $("sortSel").onchange = () => { localStorage.setItem("md_sort", $("sortSel").value); render(); };
+  $("filterDisc").onchange = saveFilter;
+  $("filterBout").onchange = saveFilter;
+  $("filterHomo").onchange = saveFilter;
+  $("filterClear").onclick = () => {
+    $("filterDisc").value = "";
+    $("filterBout").value = "";
+    $("filterHomo").value = "";
+    saveFilter();
+  };
+  render();
+})();
 $("watchModePersonal").onclick = () => { watchMode = "personal"; renderWatch(); };
 $("watchModeFriend").onclick = () => { watchMode = "friend"; renderWatch(); };
 $("watchShared").onclick = showSharedWatch;
