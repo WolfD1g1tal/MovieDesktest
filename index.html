@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.001</title>
+<title>Movie Desk 0.9.002</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -28,8 +28,19 @@
   .card-meta { color: #aaa; font-size: 0.8rem; margin: 2px 0 6px; }
   .card-added { color: #777; font-size: 0.72rem; margin: 0 0 6px; }
   .card-flags { display: flex; flex-wrap: wrap; gap: 6px; }
-  .nav { display: flex; gap: 4px; margin: 8px 0; }
-  .nav button { flex: 1; height: 40px; font-size: 0.85rem; }
+  .nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+  .nav button { flex: 1 1 30%; height: 40px; font-size: 0.78rem; }
+  .svc { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+  .svc label { display: flex; align-items: center; gap: 6px; background: #1a1a1a; border: 1px solid #333; border-radius: 999px; padding: 6px 10px; font-size: 0.78rem; cursor: pointer; max-width: 100%; }
+  .svc label.on { border-color: #7dcea0; color: #7dcea0; }
+  .svc input { margin: 0; }
+  .stream-row { padding: 10px 0; border-bottom: 1px solid #222; }
+  .stream-hits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  #secStream label.fld { display: block; color: #aaa; font-size: 0.8rem; margin: 6px 0; }
+  #secStream label.fld select, #secStream .tool-row select { width: 100%; height: 40px; margin-top: 4px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; box-sizing: border-box; }
+  #secStream .tool-row { flex-wrap: wrap; }
+  #secStream .tool-row select { flex: 1 1 140px; width: auto; }
+  #streamCheck { flex: 1 1 160px; height: 40px; }
   .nav button.active { background: #333; border-color: #666; }
   .tool-row { display: flex; gap: 8px; margin: 8px 0; }
   .tool-row select { flex: 1; height: 40px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; padding: 0 8px; }
@@ -87,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.001</h1>
+  <h1>Movie Desk 0.9.002</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -95,6 +106,7 @@
     <button id="tabInventory" class="active">Inventory</button>
     <button id="tabAdd">Add</button>
     <button id="tabWatch">Watchlist</button>
+    <button id="tabStream">Stream</button>
     <button id="tabSettings">Settings</button>
   </div>
 
@@ -194,6 +206,72 @@
     <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
   </div>
 
+  <div id="secStream" class="section">
+    <div class="tool-row">
+      <select id="streamSource" aria-label="List">
+        <option value="watch">Watchlist</option>
+        <option value="ratings">My ratings</option>
+      </select>
+      <select id="streamAvail" aria-label="Availability">
+        <option value="any">On any checked</option>
+        <option value="all">On every checked</option>
+        <option value="none">Not on checked</option>
+      </select>
+    </div>
+    <div class="section-label">Your services</div>
+    <div class="svc" id="streamYours"></div>
+    <div class="section-label">Other subscriptions</div>
+    <div class="svc" id="streamOther"></div>
+    <div class="section-label">Rent or buy</div>
+    <div class="svc" id="streamShop"></div>
+    <div class="sub" style="margin-bottom:8px">Only checked services are searched. US availability. A title must be streaming on a subscription, or rent or buy on a shop you checked.</div>
+    <label class="fld">Genre
+      <select id="streamGenre"><option value="">All genres</option></select>
+    </label>
+    <label class="fld">Disc
+      <select id="streamDisc">
+        <option value="">All</option>
+        <option value="uhd">4K</option>
+        <option value="blu">Blu-ray</option>
+        <option value="dvd">DVD</option>
+        <option value="other">Other</option>
+      </select>
+    </label>
+    <label class="fld">Boutique
+      <select id="streamBout">
+        <option value="">All</option>
+        <option value="yes">Has boutique</option>
+        <option value="no">No boutique</option>
+      </select>
+    </label>
+    <label class="fld">Homo scenes
+      <select id="streamHomo">
+        <option value="">All</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </label>
+    <label class="fld">Parents guide
+      <select id="streamGuide">
+        <option value="">All</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </label>
+    <div class="tool-row">
+      <select id="streamSort" aria-label="Sort">
+        <option value="az">A–Z</option>
+        <option value="za">Z–A</option>
+        <option value="imdb">IMDb</option>
+        <option value="you">Your rating</option>
+      </select>
+      <button type="button" id="streamCheck">Check selected services</button>
+    </div>
+    <input type="search" id="streamQ" placeholder="Find a title" autocomplete="off">
+    <div id="streamStatus" class="sub" style="margin:6px 0"></div>
+    <div id="streamOut"></div>
+  </div>
+
   <div id="secSettings" class="section">
     <div class="nav" id="settingsNav">
       <button type="button" id="setTabData" class="active">Library</button>
@@ -291,12 +369,13 @@ let dbPromise = null;
 function openDb() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
-    const req = indexedDB.open("MovieDesk", 3);
+    const req = indexedDB.open("MovieDesk", 4);
     req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains("ratings")) db.createObjectStore("ratings");
       if (!db.objectStoreNames.contains("boutique")) db.createObjectStore("boutique");
       if (!db.objectStoreNames.contains("watch")) db.createObjectStore("watch");
+      if (!db.objectStoreNames.contains("stream")) db.createObjectStore("stream");
     };
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -1966,7 +2045,7 @@ function showSettings() {
 }
 function showSection(name) {
   currentSection = name;
-  ["inventory","add","watch","settings"].forEach(s => {
+  ["inventory","add","watch","stream","settings"].forEach(s => {
     const sec = $("sec" + s.charAt(0).toUpperCase() + s.slice(1));
     const btn = $("tab" + s.charAt(0).toUpperCase() + s.slice(1));
     if (sec) sec.classList.toggle("active", s === name);
@@ -1974,8 +2053,324 @@ function showSection(name) {
   });
   if (name === "inventory") render();
   if (name === "watch") renderWatch();
+  if (name === "stream") renderStream();
   if (name === "settings") showSettings();
 }
+
+const STREAM_SERVICES = [
+  { id: 9, name: "Prime Video", group: "yours", kind: "sub" },
+  { id: 583, name: "MGM+ on Prime", group: "yours", kind: "sub" },
+  { id: 2754, name: "Howdy on Prime", group: "yours", kind: "sub" },
+  { id: 204, name: "Shudder on Prime", group: "yours", kind: "sub" },
+  { id: 2303, name: "Paramount+ Premium", group: "yours", kind: "sub" },
+  { id: 43, name: "Starz", group: "yours", kind: "sub" },
+  { id: 337, name: "Disney+", group: "other", kind: "sub" },
+  { id: 15, name: "Hulu", group: "other", kind: "sub" },
+  { id: 1899, name: "Max", group: "other", kind: "sub" },
+  { id: 350, name: "Apple TV+", group: "other", kind: "sub" },
+  { id: 386, name: "Peacock Premium", group: "other", kind: "sub" },
+  { id: 387, name: "Peacock Premium Plus", group: "other", kind: "sub" },
+  { id: 283, name: "Crunchyroll", group: "other", kind: "sub" },
+  { id: 526, name: "AMC+", group: "other", kind: "sub" },
+  { id: 258, name: "Criterion Channel", group: "other", kind: "sub" },
+  { id: 151, name: "BritBox", group: "other", kind: "sub" },
+  { id: 11, name: "MUBI", group: "other", kind: "sub" },
+  { id: 34, name: "MGM+", group: "other", kind: "sub" },
+  { id: 99, name: "Shudder", group: "other", kind: "sub" },
+  { id: 2616, name: "Paramount+ Essential", group: "other", kind: "sub" },
+  { id: 1794, name: "Starz on Prime", group: "other", kind: "sub" },
+  { id: 10, name: "Amazon Video", group: "shop", kind: "shop" },
+  { id: 2, name: "Apple TV Store", group: "shop", kind: "shop" },
+  { id: 3, name: "Google Play Movies", group: "shop", kind: "shop" },
+  { id: 192, name: "YouTube", group: "shop", kind: "shop" },
+  { id: 7, name: "Fandango at Home", group: "shop", kind: "shop" }
+];
+const STREAM_DEFAULTS = [9, 583, 2754, 204, 2303, 43];
+let streamCache = {};
+let streamToken = 0;
+function streamPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("md_stream_prefs") || "null");
+    if (Array.isArray(saved)) return saved.map(Number);
+  } catch (e) {}
+  return STREAM_DEFAULTS.slice();
+}
+function saveStreamPrefs(ids) {
+  localStorage.setItem("md_stream_prefs", JSON.stringify(ids));
+}
+function streamChecked() {
+  const on = new Set(streamPrefs());
+  return STREAM_SERVICES.filter(s => on.has(s.id));
+}
+function streamKey(item) {
+  const id = String(item.imdbId || "").trim();
+  if (id) return id;
+  return "n:" + norm(item.title || "") + ":" + String(item.year || "");
+}
+function streamInventoryHits(item) {
+  const id = String(item.imdbId || "").trim();
+  const all = getAll();
+  if (id) {
+    const hits = all.filter(m => String(m.imdbId || "") === id);
+    if (hits.length) return hits;
+  }
+  const n = norm(item.title || "");
+  const y = movieYear(item);
+  if (!n) return [];
+  return all.filter(m => norm(m.title) === n && (!y || !movieYear(m) || movieYear(m) === y));
+}
+function streamPassesOwn(item) {
+  const disc = $("streamDisc") ? $("streamDisc").value : "";
+  const bout = $("streamBout") ? $("streamBout").value : "";
+  const homo = $("streamHomo") ? $("streamHomo").value : "";
+  const guide = $("streamGuide") ? $("streamGuide").value : "";
+  if (!disc && !bout && !homo && !guide) return true;
+  const hits = streamInventoryHits(item);
+  if (!hits.length) {
+    if (disc || bout === "yes" || homo === "yes" || guide === "yes") return false;
+    return true;
+  }
+  return hits.some(m => {
+    if (disc && discBucket(m) !== disc) return false;
+    const hasB = !!(boutiqueFlags[m.id] || m.boutiqueLabel);
+    if (bout === "yes" && !hasB) return false;
+    if (bout === "no" && hasB) return false;
+    const hk = homoKey(m);
+    if (homo === "yes" && !homoFlags[hk]) return false;
+    if (homo === "no" && homoFlags[hk]) return false;
+    if (guide === "yes" && !guideFlags[hk]) return false;
+    if (guide === "no" && guideFlags[hk]) return false;
+    return true;
+  });
+}
+function streamGenreNames(item, rec) {
+  const set = [];
+  const add = g => {
+    const t = String(g || "").trim();
+    if (t && set.indexOf(t) < 0) set.push(t);
+  };
+  ((rec && rec.genres) || []).forEach(add);
+  streamInventoryHits(item).forEach(m => String(m.genres || "").split(/[,/|]/).forEach(add));
+  return set;
+}
+function streamSourceItems() {
+  const src = ($("streamSource") && $("streamSource").value) || "watch";
+  if (src === "ratings") {
+    const rows = [];
+    const seen = new Set();
+    Object.keys(myRatingsById || {}).forEach(k => {
+      const r = myRatingsById[k];
+      if (!r || !r.title) return;
+      const key = r.imdbId || norm(r.title);
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push({ title: r.title, imdbId: r.imdbId || "", year: r.year || "", type: r.type || "", imdbRating: "", yours: r.rating || "" });
+    });
+    if (!rows.length) {
+      Object.keys(myRatings || {}).forEach(k => {
+        const list = Array.isArray(myRatings[k]) ? myRatings[k] : [];
+        list.forEach(r => {
+          if (!r || !r.title) return;
+          rows.push({ title: r.title, imdbId: r.imdbId || "", year: r.year || "", type: r.type || "", imdbRating: "", yours: r.rating || "" });
+        });
+      });
+    }
+    return rows.filter(r => !RATING_SKIP[String(r.type || "").toLowerCase()]);
+  }
+  return (myWatchlist || []).filter(w => w && !RATING_SKIP[String(w.type || "").toLowerCase()]).map(w => ({
+    title: watchTitle(w),
+    imdbId: w.imdbId || "",
+    year: w.year || "",
+    type: w.type || "",
+    imdbRating: w.imdbRating || "",
+    yours: ""
+  }));
+}
+function paintServices() {
+  const on = new Set(streamPrefs());
+  const boxes = { yours: $("streamYours"), other: $("streamOther"), shop: $("streamShop") };
+  Object.keys(boxes).forEach(k => { if (boxes[k]) boxes[k].innerHTML = ""; });
+  STREAM_SERVICES.forEach(svc => {
+    const box = boxes[svc.group];
+    if (!box) return;
+    const label = document.createElement("label");
+    if (on.has(svc.id)) label.className = "on";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = on.has(svc.id);
+    input.setAttribute("aria-label", svc.name);
+    input.onchange = () => {
+      const ids = streamPrefs().filter(id => id !== svc.id);
+      if (input.checked) ids.push(svc.id);
+      saveStreamPrefs(ids);
+      label.classList.toggle("on", input.checked);
+      renderStream();
+    };
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(svc.name));
+    box.appendChild(label);
+  });
+}
+function serviceMatch(rec, svc) {
+  const hits = (rec && rec.hits) || [];
+  if (svc.kind === "shop") return hits.filter(h => h.id === svc.id && (h.offer === "rent" || h.offer === "buy"));
+  return hits.filter(h => h.id === svc.id && h.offer === "sub");
+}
+function offerWord(hits) {
+  const kinds = [];
+  hits.forEach(h => {
+    const w = h.offer === "sub" ? "Streaming" : (h.offer === "rent" ? "Rent" : "Buy");
+    if (kinds.indexOf(w) < 0) kinds.push(w);
+  });
+  return kinds.join(" · ");
+}
+async function idbPutOne(store, key, val) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function loadStreamCache() {
+  try { streamCache = await idbGetAll("stream") || {}; }
+  catch (e) { streamCache = {}; }
+}
+async function fetchStream(item) {
+  let kind = "movie";
+  let id = null;
+  if (item.imdbId) {
+    const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(item.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
+    const d = await res.json();
+    if (d.movie_results && d.movie_results[0]) { kind = "movie"; id = d.movie_results[0].id; }
+    else if (d.tv_results && d.tv_results[0]) { kind = "tv"; id = d.tv_results[0].id; }
+  }
+  if (!id && item.title) {
+    let url = "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(item.title) + "&api_key=" + TMDB_KEY;
+    const y = String(item.year || "").match(/(19|20)\d{2}/);
+    if (y) url += "&year=" + y[0];
+    const res = await fetch(url);
+    const d = await res.json();
+    if (d.results && d.results[0]) { id = d.results[0].id; kind = "movie"; }
+  }
+  if (!id) return { genres: [], hits: [], miss: true, at: Date.now() };
+  const res = await fetch("https://api.themoviedb.org/3/" + kind + "/" + id + "?append_to_response=watch/providers&api_key=" + TMDB_KEY);
+  const d = await res.json();
+  const genres = (d.genres || []).map(g => g.name).filter(Boolean);
+  const us = (d["watch/providers"] && d["watch/providers"].results && d["watch/providers"].results.US) || {};
+  const hits = [];
+  const take = (arr, offer) => (arr || []).forEach(p => {
+    if (!p || STREAM_SERVICES.every(s => s.id !== p.provider_id)) return;
+    hits.push({ id: p.provider_id, name: p.provider_name || "", offer: offer });
+  });
+  take(us.flatrate, "sub");
+  take(us.rent, "rent");
+  take(us.buy, "buy");
+  return { genres: genres, hits: hits, miss: false, at: Date.now() };
+}
+function renderStream() {
+  paintServices();
+  const items = streamSourceItems();
+  const q = (($("streamQ") && $("streamQ").value) || "").trim().toLowerCase();
+  const genre = ($("streamGenre") && $("streamGenre").value) || "";
+  const mode = ($("streamAvail") && $("streamAvail").value) || "any";
+  const checked = streamChecked();
+  const genreSet = new Set();
+  let rows = items.filter(item => {
+    if (q && String(item.title || "").toLowerCase().indexOf(q) < 0) return false;
+    if (!streamPassesOwn(item)) return false;
+    return true;
+  });
+  rows = rows.filter(item => {
+    const rec = streamCache[streamKey(item)];
+    const names = streamGenreNames(item, rec);
+    names.forEach(g => genreSet.add(g));
+    if (genre && names.indexOf(genre) < 0) return false;
+    if (!rec) return mode === "any";
+    const matched = checked.filter(svc => serviceMatch(rec, svc).length);
+    if (mode === "all") return checked.length > 0 && matched.length === checked.length;
+    if (mode === "none") return matched.length === 0;
+    return matched.length > 0;
+  });
+  const sel = $("streamGenre");
+  if (sel) {
+    const cur = genre;
+    const opts = ['<option value="">All genres</option>'].concat([...genreSet].sort().map(g => '<option value="' + escWatch(g) + '">' + escWatch(g) + '</option>'));
+    sel.innerHTML = opts.join("");
+    if ([...genreSet].indexOf(cur) >= 0 || cur === "") sel.value = cur;
+  }
+  rows.sort((a, b) => {
+    const sort = ($("streamSort") && $("streamSort").value) || "az";
+    if (sort === "imdb") return (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0);
+    if (sort === "you") return (parseFloat(b.yours) || 0) - (parseFloat(a.yours) || 0);
+    const c = String(a.title || "").localeCompare(String(b.title || ""));
+    return sort === "za" ? -c : c;
+  });
+  const shown = rows.slice(0, 80);
+  const box = $("streamOut");
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
+    return;
+  }
+  box.innerHTML = shown.map(item => {
+    const rec = streamCache[streamKey(item)] || null;
+    const matched = checked.map(svc => ({ svc: svc, hits: rec ? serviceMatch(rec, svc) : [] })).filter(x => x.hits.length);
+    const badges = matched.map(x => '<span class="flag own">' + escWatch(x.svc.name) + " · " + escWatch(offerWord(x.hits)) + "</span>").join("");
+    const extra = item.yours ? " · You " + escWatch(item.yours) : (item.imdbRating ? " · IMDb " + escWatch(item.imdbRating) : "");
+    const looked = rec ? "" : " <span class='sub'>not checked</span>";
+    return '<div class="stream-row"><b>' + escWatch(item.title) + '</b>'
+      + (item.year ? ' <span class="sub">(' + escWatch(item.year) + ')</span>' : '')
+      + '<span class="sub">' + extra + '</span>' + looked
+      + (badges ? '<div class="stream-hits">' + badges + '</div>' : '')
+      + '</div>';
+  }).join("") || "<div style='color:#777'>Nothing matches.</div>";
+  const more = rows.length > shown.length ? '<div class="sub">Showing ' + shown.length + ' of ' + rows.length + '.</div>' : "";
+  if (more) box.insertAdjacentHTML("afterbegin", more);
+}
+async function runStreamCheck() {
+  const btn = $("streamCheck");
+  if (btn && btn.dataset.running === "1") { streamToken++; btn.dataset.running = ""; btn.textContent = "Check selected services"; return; }
+  const token = ++streamToken;
+  if (btn) { btn.dataset.running = "1"; btn.textContent = "Stop"; }
+  const items = streamSourceItems().filter(streamPassesOwn);
+  const fresh = 7 * 24 * 60 * 60 * 1000;
+  let done = 0;
+  const status = $("streamStatus");
+  for (let i = 0; i < items.length; i++) {
+    if (token !== streamToken) break;
+    const item = items[i];
+    const key = streamKey(item);
+    const rec = streamCache[key];
+    if (rec && rec.at && (Date.now() - rec.at) < fresh) { done++; continue; }
+    if (status) status.textContent = "Checking " + (i + 1) + " of " + items.length + " · " + item.title;
+    try {
+      const got = await fetchStream(item);
+      streamCache[key] = got;
+      await idbPutOne("stream", key, got);
+    } catch (e) {
+      if (status) status.textContent = "Lookup failed on " + item.title;
+    }
+    done++;
+    if (i % 2 === 1) await new Promise(r => setTimeout(r, 700));
+    if (done % 3 === 0) renderStream();
+  }
+  if (btn && token === streamToken) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
+  if (status && token === streamToken) status.textContent = "Checked " + done + " of " + items.length + ".";
+  renderStream();
+}
+function wireStream() {
+  ["streamSource","streamAvail","streamGenre","streamDisc","streamBout","streamHomo","streamGuide","streamSort"].forEach(id => {
+    const el = $(id);
+    if (el) el.onchange = () => renderStream();
+  });
+  if ($("streamQ")) $("streamQ").oninput = () => renderStream();
+  if ($("streamCheck")) $("streamCheck").onclick = () => runStreamCheck();
+  loadStreamCache().then(() => { if (currentSection === "stream") renderStream(); });
+}
+wireStream();
+
 
 function watchItem(x) {
   if (x && typeof x === "object") return { title: x.title || "", imdbId: x.imdbId || "", year: x.year || "", type: x.type || "", imdbRating: x.imdbRating || "" };
@@ -2220,6 +2615,7 @@ if ($("setTabData")) $("setTabData").onclick = () => showSettingsTab("data");
 if ($("setTabLook")) $("setTabLook").onclick = () => showSettingsTab("look");
 renderBadgeSettings();
 $("tabWatch").onclick = () => showSection("watch");
+$("tabStream").onclick = () => showSection("stream");
 $("q").oninput = () => render();
 (function initInventoryTools() {
   const savedSort = localStorage.getItem("md_sort") || "added-new";
