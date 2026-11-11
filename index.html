@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.7.022</title>
+<title>Movie Desk 0.9.001</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -48,6 +48,8 @@
   .own { background: #1a3a2a; color: #7dcea0; }
   .gay-no { background: #1a2a3a; color: #8ab4e0; cursor: pointer; }
   .gay-yes { background: #3a1a2a; color: #e08ab4; cursor: pointer; }
+  .guide-no { background: #2a2a2a; color: #bbb; cursor: pointer; }
+  .guide-yes { background: #3a2a10; color: #e0b060; cursor: pointer; }
   .imdb { background: #2a2a1a; color: #e0c07a; }
   .you { background: #0a2a2a; color: #00e5ff; }
   .pkg { background: #2a1a2a; color: #e0a07a; }
@@ -85,7 +87,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.7.022</h1>
+  <h1>Movie Desk 0.9.001</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -130,6 +132,13 @@
       </label>
       <label>Homo scenes
         <select id="filterHomo">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </label>
+      <label>Parents guide
+        <select id="filterGuide">
           <option value="">All</option>
           <option value="yes">Yes</option>
           <option value="no">No</option>
@@ -259,6 +268,7 @@ const $ = id => document.getElementById(id);
 let collection = JSON.parse(localStorage.getItem("md_coll") || "[]");
 let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
 let homoFlags = JSON.parse(localStorage.getItem("md_homo") || "{}");
+let guideFlags = JSON.parse(localStorage.getItem("md_guide") || "{}");
 let boutiqueFlags = JSON.parse(localStorage.getItem("md_boutique") || "{}");
 const BOUTIQUE_LABELS = ["Arrow","Manta Labs","Kino Lorber","Criterion","Vinegar Syndrome","Severin","Scream Factory","Shout Factory","88 Films","Eureka","Indicator"];
 function stripBoutique(label) {
@@ -578,6 +588,7 @@ let scanTarget = null; // "mother" or "child"
 function saveColl(){ localStorage.setItem("md_coll", JSON.stringify(collection)); }
 function saveManual(){ localStorage.setItem("md_manual", JSON.stringify(manualTitles)); }
 function saveHomo(){ localStorage.setItem("md_homo", JSON.stringify(homoFlags)); }
+function saveGuide(){ localStorage.setItem("md_guide", JSON.stringify(guideFlags)); }
 function saveBoutique(){ localStorage.setItem("md_boutique", JSON.stringify(boutiqueFlags)); }
 function norm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
 let lastAddedId = "";
@@ -593,12 +604,13 @@ $("stripBoutiqueBtn").onclick = () => {
   if (label) stripBoutique(label.trim());
 };
 $("exportBtn").onclick = () => {
-  const rows = [["title","barcode","type","motherId","boutique","homosexualScenes","imdbRating","friendRating"]];
+  const rows = [["title","barcode","type","motherId","boutique","homosexualScenes","parentsGuide","imdbRating","friendRating"]];
   const name = ($("friendName") && $("friendName").value.trim()) || "";
   getAll().forEach(m => {
     const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
     const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
     const homo = homoFlags[key] ? "yes" : "no";
+    const guide = guideFlags[key] ? "yes" : "no";
     const fr = friendRatings[norm(m.title)] || "";
     rows.push([
       m.title || "",
@@ -607,6 +619,7 @@ $("exportBtn").onclick = () => {
       m.motherId || "",
       bout,
       homo,
+      guide,
       m.publicRating || "",
       fr
     ]);
@@ -1502,6 +1515,7 @@ function activeFilterCount() {
   if ($("filterDisc") && $("filterDisc").value) n++;
   if ($("filterBout") && $("filterBout").value) n++;
   if ($("filterHomo") && $("filterHomo").value) n++;
+  if ($("filterGuide") && $("filterGuide").value) n++;
   return n;
 }
 function sortList(list, mode) {
@@ -1547,6 +1561,9 @@ function render() {
   if (bout === "no") all = all.filter(m => !(boutiqueFlags[m.id] || m.boutiqueLabel));
   if (homo === "yes") all = all.filter(m => !!homoFlags[homoKey(m)]);
   if (homo === "no") all = all.filter(m => !homoFlags[homoKey(m)]);
+  const guide = $("filterGuide") ? $("filterGuide").value : "";
+  if (guide === "yes") all = all.filter(m => !!guideFlags[homoKey(m)]);
+  if (guide === "no") all = all.filter(m => !guideFlags[homoKey(m)]);
   const mode = ($("sortSel") && $("sortSel").value) || "added-new";
   all = sortList(all, mode);
   const cap = 200;
@@ -1636,6 +1653,7 @@ function render() {
           ${pkgNote}
           ${boutNote}
           <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homo: ${isYes?"yes":"no"}</span>
+          <span class="flag ${guideFlags[key]?"guide-yes":"guide-no"}" data-guide="${key}">Guide: ${guideFlags[key]?"yes":"no"}</span>
           <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
           ${ratingBadge(m)}
         </div>
@@ -1651,6 +1669,15 @@ function render() {
       const k = el.dataset.key;
       homoFlags[k] = !homoFlags[k];
       saveHomo();
+      render();
+    };
+  });
+  document.querySelectorAll(".flag[data-guide]").forEach(el => {
+    el.onclick = () => {
+      const k = el.dataset.guide;
+      guideFlags[k] = !guideFlags[k];
+      if (!guideFlags[k]) delete guideFlags[k];
+      saveGuide();
       render();
     };
   });
@@ -1882,6 +1909,7 @@ function showSettings() {
     { key: "md_my_watch", label: "Personal watchlist", data: myWatchlist },
     { key: "md_friend_watch", label: "Friend watchlist", data: friendWatchlist },
     { key: "md_homo", label: "Homosexual-scenes flags", data: homoFlags },
+    { key: "md_guide", label: "Parents-guide flags", data: guideFlags },
     { key: "md_boutique", label: "Boutique labels", data: boutiqueFlags },
     { key: "boutique-catalog", label: "Boutique catalog (barcode index)", data: boutiqueCatalog }
   ];
@@ -1927,6 +1955,7 @@ function showSettings() {
       if (key === "md_my_watch") { myWatchlist = []; idbClear("watch"); }
       if (key === "md_friend_watch") friendWatchlist = [];
       if (key === "md_homo") Object.keys(homoFlags).forEach(k => delete homoFlags[k]);
+      if (key === "md_guide") Object.keys(guideFlags).forEach(k => delete guideFlags[k]);
       if (key === "md_boutique") Object.keys(boutiqueFlags).forEach(k => delete boutiqueFlags[k]);
       if (key === "boutique-catalog") { boutiqueCatalog = {}; idbClear("boutique"); }
       showPopup("Cleared " + key);
@@ -2200,11 +2229,13 @@ $("q").oninput = () => render();
   if ($("filterDisc")) $("filterDisc").value = saved.disc || "";
   if ($("filterBout")) $("filterBout").value = saved.bout || "";
   if ($("filterHomo")) $("filterHomo").value = saved.homo || "";
+  if ($("filterGuide")) $("filterGuide").value = saved.guide || "";
   function saveFilter() {
     localStorage.setItem("md_filter", JSON.stringify({
       disc: $("filterDisc").value,
       bout: $("filterBout").value,
-      homo: $("filterHomo").value
+      homo: $("filterHomo").value,
+      guide: $("filterGuide").value
     }));
     render();
   }
@@ -2213,10 +2244,12 @@ $("q").oninput = () => render();
   $("filterDisc").onchange = saveFilter;
   $("filterBout").onchange = saveFilter;
   $("filterHomo").onchange = saveFilter;
+  $("filterGuide").onchange = saveFilter;
   $("filterClear").onclick = () => {
     $("filterDisc").value = "";
     $("filterBout").value = "";
     $("filterHomo").value = "";
+    $("filterGuide").value = "";
     saveFilter();
   };
   render();
