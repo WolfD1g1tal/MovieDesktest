@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.006</title>
+<title>Movie Desk 0.9.007</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.006</h1>
+  <h1>Movie Desk 0.9.007</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -213,11 +213,6 @@
         <option value="ratings">My ratings</option>
         <option value="any">Anything</option>
       </select>
-      <select id="streamAvail" aria-label="Availability">
-        <option value="any">On any checked</option>
-        <option value="all">On every checked</option>
-        <option value="none">Not on checked</option>
-      </select>
     </div>
     <div class="section-label">Your services</div>
     <div class="svc" id="streamYours"></div>
@@ -225,7 +220,7 @@
     <div class="svc" id="streamOther"></div>
     <div class="section-label">Rent or buy</div>
     <div class="svc" id="streamShop"></div>
-    <div class="sub" style="margin-bottom:8px">Watchlist and ratings only check titles that already match. Anything can be a title, cast name, year, genre, or subgenre on its own. Only those matches are checked. US availability.</div>
+    <div class="sub" style="margin-bottom:8px">A genre or subgenre searches on its own. A check only looks at the services you selected, and each title names that service. US availability.</div>
     <label class="fld">Genre
       <select id="streamGenre">
         <option value="">All genres</option>
@@ -2486,9 +2481,25 @@ const TMDB_TV_GENRE = { Action: 10759, Adventure: 10759, Animation: 16, Comedy: 
 const GENRE_BY_ID = { 28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime", 99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History", 27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Sci-Fi", 53: "Thriller", 10752: "War", 37: "Western", 10759: "Action", 10765: "Sci-Fi", 10768: "War", 10763: "News", 10764: "Reality-TV", 10767: "Talk-Show" };
 const STREAM_SKIP_OPEN = { adult: 1, eroticthriller: 1, steamyromance: 1 };
 const tmdbKeywordCache = {};
+function streamGenreValue() { return ($("streamGenre") && $("streamGenre").value) || ""; }
+function streamSubValue() { return ($("streamSub") && $("streamSub").value) || ""; }
+function streamCatalog() { return streamIsAny() || !!(streamGenreValue() || streamSubValue()); }
+const SUBGENRE_TAILS = ["Horror","Comedy","Drama","Documentary","Thriller","Mystery","Romance","Sci-Fi","Fantasy","Western","Action","Adventure","Animation","Crime","Family","War","Musical","Reality TV"];
+function subgenreParts(name) {
+  const raw = String(name || "").trim();
+  for (let i = 0; i < SUBGENRE_TAILS.length; i++) {
+    const tail = SUBGENRE_TAILS[i];
+    const re = new RegExp("\\s+" + tail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i");
+    if (!re.test(raw)) continue;
+    const short = raw.replace(re, "").trim();
+    const genre = tail === "Musical" ? "Music" : (tail === "Reality TV" ? "Reality-TV" : tail);
+    return { short: short, genre: genre };
+  }
+  return { short: "", genre: "" };
+}
 function queueStreamAny() {
   clearTimeout(streamAnyTimer);
-  if (!streamIsAny()) return;
+  if (!streamCatalog()) return;
   streamAnyTimer = setTimeout(loadStreamAny, 300);
 }
 function parseAnyQuery(raw) {
@@ -2550,24 +2561,33 @@ async function tmdbKeywordId(name, signal) {
   if (tmdbKeywordCache[key]) return tmdbKeywordCache[key];
   const d = await tmdbGet("/search/keyword", { query: name }, signal);
   const rows = (d && d.results) || [];
-  const hit = rows.find(r => genreKeyName(r.name) === key) || rows[0];
+  const hit = rows.find(r => genreKeyName(r.name) === key);
   const id = hit && hit.id ? String(hit.id) : "";
   if (id) tmdbKeywordCache[key] = id;
   return id;
 }
 async function discoverKind(kind, genreId, keywordId, parsed, signal) {
-  const params = { sort_by: "popularity.desc", include_adult: "false", page: "1" };
-  if (genreId) params.with_genres = String(genreId);
-  if (keywordId) params.with_keywords = String(keywordId);
-  if (parsed.dayStart) {
-    const prefix = kind === "tv" ? "first_air_date" : "primary_release_date";
-    params[prefix + ".gte"] = parsed.dayStart;
-    params[prefix + ".lte"] = parsed.dayEnd;
-  } else if (parsed.year) {
-    params[kind === "tv" ? "first_air_date_year" : "primary_release_year"] = parsed.year;
-  }
-  const d = await tmdbGet(kind === "tv" ? "/discover/tv" : "/discover/movie", params, signal);
-  return ((d && d.results) || []).filter(r => r && (r.title || r.name) && !r.adult).slice(0, 10);
+  const build = (strict) => {
+    const params = { sort_by: parsed.dayStart ? "popularity.desc" : "vote_count.desc", include_adult: "false", page: "1" };
+    if (strict && !parsed.dayStart) params["vote_count.gte"] = "50";
+    if (genreId) params.with_genres = String(genreId);
+    if (keywordId) params.with_keywords = String(keywordId);
+    if (parsed.dayStart) {
+      const prefix = kind === "tv" ? "first_air_date" : "primary_release_date";
+      params[prefix + ".gte"] = parsed.dayStart;
+      params[prefix + ".lte"] = parsed.dayEnd;
+    } else if (parsed.year) {
+      params[kind === "tv" ? "first_air_date_year" : "primary_release_year"] = parsed.year;
+    }
+    return params;
+  };
+  const pull = async (params) => {
+    const d = await tmdbGet(kind === "tv" ? "/discover/tv" : "/discover/movie", params, signal);
+    return ((d && d.results) || []).filter(r => r && (r.title || r.name) && !r.adult);
+  };
+  let rows = await pull(build(true));
+  if (!rows.length) rows = await pull(build(false));
+  return rows.slice(0, 10);
 }
 function keepTextRow(row, kind, genre, movieGenre, tvGenre) {
   if (!genre) return true;
@@ -2579,9 +2599,10 @@ function keepTextRow(row, kind, genre, movieGenre, tvGenre) {
   return (row.genre_ids || []).map(String).indexOf(String(movieGenre)) >= 0;
 }
 async function loadStreamAny() {
-  const parsed = parseAnyQuery(($("streamQ") && $("streamQ").value) || "");
-  const genre = ($("streamGenre") && $("streamGenre").value) || "";
-  const subg = ($("streamSub") && $("streamSub").value) || "";
+  const parsed = parseAnyQuery(streamIsAny() ? (($("streamQ") && $("streamQ").value) || "") : "");
+  const genre = streamGenreValue();
+  const subg = streamSubValue();
+  const parts = subgenreParts(subg);
   const seq = ++streamAnySeq;
   if (streamAnyCtrl) streamAnyCtrl.abort();
   const paint = () => { if (seq === streamAnySeq && currentSection === "stream") renderStream(); };
@@ -2603,10 +2624,12 @@ async function loadStreamAny() {
   streamAnyCtrl = typeof AbortController === "function" ? new AbortController() : null;
   const signal = streamAnyCtrl ? streamAnyCtrl.signal : undefined;
   try {
-    const movieGenre = TMDB_MOVIE_GENRE[genre] || 0;
-    const tvGenre = TMDB_TV_GENRE[genre] || 0;
-    const keywordName = subg || ((!movieGenre && !tvGenre && genre) ? genre : "");
-    const keywordId = keywordName ? await tmdbKeywordId(keywordName, signal) : "";
+    const genreName = genre || parts.genre || "";
+    const movieGenre = TMDB_MOVIE_GENRE[genreName] || 0;
+    const tvGenre = TMDB_TV_GENRE[genreName] || 0;
+    const keywordName = subg ? ((parts.short && parts.short.split(/\s+/).length >= 2) ? parts.short : subg) : ((!movieGenre && !tvGenre && genre) ? genre : "");
+    let keywordId = keywordName ? await tmdbKeywordId(keywordName, signal) : "";
+    if (!keywordId && subg && keywordName !== subg) keywordId = await tmdbKeywordId(subg, signal);
     if (seq !== streamAnySeq) return;
     const extra = [genre, subg].filter(Boolean).join(", ");
     let rows = [];
@@ -2669,7 +2692,7 @@ async function loadStreamAny() {
 }
 function streamSourceItems() {
   const src = ($("streamSource") && $("streamSource").value) || "watch";
-  if (src === "any") return streamAny.slice();
+  if (src === "any" || streamGenreValue() || streamSubValue()) return streamAny.slice();
   if (src === "ratings") {
     const rows = [];
     const seen = new Set();
@@ -2797,17 +2820,9 @@ async function fetchStream(item) {
 function renderStream() {
   if (!servicesReady) paintServices();
   const items = streamSourceItems();
-  const mode = ($("streamAvail") && $("streamAvail").value) || "any";
   const checked = streamChecked();
   const matchedItems = streamFilteredItems();
-  let rows = matchedItems.filter(item => {
-    const rec = streamCache[streamKey(item)];
-    if (!rec) return mode === "any";
-    const matched = checked.filter(svc => serviceMatch(rec, svc).length);
-    if (mode === "all") return checked.length > 0 && matched.length === checked.length;
-    if (mode === "none") return matched.length === 0;
-    return matched.length > 0;
-  });
+  let rows = matchedItems.slice();
   rows.sort((a, b) => {
     const sort = ($("streamSort") && $("streamSort").value) || "az";
     if (sort === "imdb") return (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0);
@@ -2819,14 +2834,14 @@ function renderStream() {
   const box = $("streamOut");
   if (!box) return;
   if (!items.length) {
-    if (streamIsAny()) box.innerHTML = "<div style='color:#777'>" + escWatch(streamAnyNote || "Type a title, cast name, or year, or pick a genre or subgenre.") + "</div>";
+    if (streamCatalog()) box.innerHTML = "<div style='color:#777'>" + escWatch(streamAnyNote || "Type a title, cast name, or year, or pick a genre or subgenre.") + "</div>";
     else box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
     return;
   }
   box.innerHTML = shown.map(item => {
     const rec = streamCache[streamKey(item)] || null;
     const matched = checked.map(svc => ({ svc: svc, hits: rec ? serviceMatch(rec, svc) : [] })).filter(x => x.hits.length);
-    const badges = matched.map(x => '<span class="flag own">' + escWatch(x.svc.name) + " · " + escWatch(offerWord(x.hits)) + "</span>").join("");
+    const where = !rec ? "" : (matched.length ? matched.map(x => x.svc.name + " · " + offerWord(x.hits)).join(", ") : "Not on selected services");
     const extra = item.yours ? " · You " + escWatch(item.yours) : (item.imdbRating ? " · IMDb " + escWatch(item.imdbRating) : "");
     const looked = rec ? "" : " <span class='sub'>not checked</span>";
     const tags = genreTagHtml(streamGenreNames(item).join(", "));
@@ -2834,8 +2849,8 @@ function renderStream() {
       + (item.year ? ' <span class="sub">(' + escWatch(item.year) + ')</span>' : '')
       + (item.cast ? ' <span class="sub">· ' + escWatch(item.cast) + '</span>' : '')
       + '<span class="sub">' + extra + '</span>' + looked
+      + (where ? '<div class="stream-hits"><b>' + escWatch(where) + '</b></div>' : '')
       + (tags ? '<div class="stream-hits">' + tags + '</div>' : '')
-      + (badges ? '<div class="stream-hits">' + badges + '</div>' : '')
       + '</div>';
   }).join("") || "<div style='color:#777'>Nothing matches.</div>";
   const more = rows.length > shown.length ? '<div class="sub">Showing ' + shown.length + ' of ' + rows.length + '.</div>' : "";
@@ -2848,6 +2863,12 @@ async function runStreamCheck() {
   if (btn) { btn.dataset.running = "1"; btn.textContent = "Stop"; }
   const status = $("streamStatus");
   const items = streamFilteredItems();
+  if (!streamChecked().length) {
+    if (status) status.textContent = "Select a service first. Nothing was checked.";
+    if (btn) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
+    renderStream();
+    return;
+  }
   if (!items.length) {
     if (status) status.textContent = streamIsAny()
       ? "Add a title, cast, year, genre, or subgenre first. Nothing was checked."
@@ -2898,13 +2919,13 @@ function syncStreamSearchHint() {
   if ($("streamQ")) $("streamQ").placeholder = streamIsAny() ? "Title, cast, or year" : "Title, year, genre, director, date";
 }
 function wireStream() {
-  ["streamAvail","streamHomo","streamSort"].forEach(id => {
+  ["streamHomo","streamSort"].forEach(id => {
     const el = $(id);
     if (el) el.onchange = () => renderStream();
   });
   ["streamGenre","streamSub"].forEach(id => {
     const el = $(id);
-    if (el) el.onchange = () => { if (streamIsAny()) queueStreamAny(); renderStream(); };
+    if (el) el.onchange = () => { queueStreamAny(); renderStream(); };
   });
   if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); if (streamIsAny()) queueStreamAny(); renderStream(); };
   if ($("streamQ")) $("streamQ").oninput = () => { queueRenderStream(); if (streamIsAny()) queueStreamAny(); };
