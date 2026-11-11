@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.004</title>
+<title>Movie Desk 0.9.005</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.004</h1>
+  <h1>Movie Desk 0.9.005</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -211,6 +211,7 @@
       <select id="streamSource" aria-label="List">
         <option value="watch">Watchlist</option>
         <option value="ratings">My ratings</option>
+        <option value="any">Anything</option>
       </select>
       <select id="streamAvail" aria-label="Availability">
         <option value="any">On any checked</option>
@@ -224,7 +225,7 @@
     <div class="svc" id="streamOther"></div>
     <div class="section-label">Rent or buy</div>
     <div class="svc" id="streamShop"></div>
-    <div class="sub" style="margin-bottom:8px">Only checked services are searched, and only titles that already match the genre, subgenre, and search box. US availability.</div>
+    <div class="sub" style="margin-bottom:8px">Watchlist and ratings only check titles that already match. Anything searches any title you type. US availability.</div>
     <label class="fld">Genre
       <select id="streamGenre">
         <option value="">All genres</option>
@@ -2422,9 +2423,14 @@ function streamInventoryHits(item) {
 function genreKeyName(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
 function splitGenreTags(s) { return String(s || "").split(/[,/|]/).map(g => g.trim()).filter(Boolean); }
 function sameGenre(a, b) { return genreKeyName(a) && genreKeyName(a) === genreKeyName(b); }
+function streamIsAny() {
+  return ($("streamSource") && $("streamSource").value) === "any";
+}
 function itemHasGenre(item, name) {
   if (!name) return true;
-  return splitGenreTags(item && item.genres).some(g => sameGenre(g, name));
+  const tags = streamGenreNames(item);
+  if (!tags.length) return streamIsAny();
+  return tags.some(g => sameGenre(g, name));
 }
 function genreTagHtml(genres) {
   return splitGenreTags(genres).map(g => '<span class="flag" style="background:#1a2a22;color:#9dccb0">' + escWatch(g) + '</span>').join("");
@@ -2448,6 +2454,8 @@ function streamGenreNames(item) {
     if (t && !set.some(x => sameGenre(x, t))) set.push(t);
   };
   splitGenreTags(item && item.genres).forEach(add);
+  const rec = item && streamCache[streamKey(item)];
+  if (rec && rec.genres) rec.genres.forEach(add);
   if (!set.length) streamInventoryHits(item).forEach(m => splitGenreTags(m.genres).forEach(add));
   return set;
 }
@@ -2458,16 +2466,61 @@ function streamFilteredItems() {
   const q = (($("streamQ") && $("streamQ").value) || "").trim().toLowerCase();
   const genre = ($("streamGenre") && $("streamGenre").value) || "";
   const subg = ($("streamSub") && $("streamSub").value) || "";
+  const any = streamIsAny();
   return streamSourceItems().filter(item => {
-    if (q && streamHay(item).indexOf(q) < 0) return false;
+    if (q && !any && streamHay(item).indexOf(q) < 0) return false;
     if (!itemHasGenre(item, genre)) return false;
     if (!itemHasGenre(item, subg)) return false;
     if (!streamPassesOwn(item)) return false;
     return true;
   });
 }
+let streamAny = [];
+let streamAnySeq = 0;
+let streamAnyCtrl = null;
+let streamAnyTimer = 0;
+function queueStreamAny() {
+  clearTimeout(streamAnyTimer);
+  if (!streamIsAny()) return;
+  streamAnyTimer = setTimeout(loadStreamAny, 300);
+}
+async function loadStreamAny() {
+  const q = (($("streamQ") && $("streamQ").value) || "").trim();
+  const seq = ++streamAnySeq;
+  if (streamAnyCtrl) streamAnyCtrl.abort();
+  if (q.length < 2) {
+    streamAny = [];
+    if (currentSection === "stream") renderStream();
+    return;
+  }
+  streamAnyCtrl = typeof AbortController === "function" ? new AbortController() : null;
+  try {
+    const res = await fetch("https://www.omdbapi.com/?s=" + encodeURIComponent(q) + "&page=1&apikey=" + OMDB_KEY, streamAnyCtrl ? { signal: streamAnyCtrl.signal } : {});
+    if (seq !== streamAnySeq) return;
+    const d = await res.json();
+    const rows = (d && d.Search) || [];
+    streamAny = rows.filter(m => m && m.Title && !RATING_SKIP[String(m.Type || "").toLowerCase()]).slice(0, 10).map(m => ({
+      title: m.Title,
+      imdbId: m.imdbID || "",
+      year: m.Year || "",
+      type: m.Type || "",
+      imdbRating: "",
+      yours: "",
+      genres: "",
+      director: "",
+      runtime: "",
+      date: "",
+      released: ""
+    }));
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    if (seq === streamAnySeq) streamAny = [];
+  }
+  if (seq === streamAnySeq && currentSection === "stream") renderStream();
+}
 function streamSourceItems() {
   const src = ($("streamSource") && $("streamSource").value) || "watch";
+  if (src === "any") return streamAny.slice();
   if (src === "ratings") {
     const rows = [];
     const seen = new Set();
@@ -2616,7 +2669,10 @@ function renderStream() {
   const box = $("streamOut");
   if (!box) return;
   if (!items.length) {
-    box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
+    if (streamIsAny()) {
+      const typed = (($("streamQ") && $("streamQ").value) || "").trim();
+      box.innerHTML = "<div style='color:#777'>" + (typed.length < 2 ? "Type a title to search any movie or show." : "No titles found.") + "</div>";
+    } else box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
     return;
   }
   box.innerHTML = shown.map(item => {
@@ -2644,7 +2700,9 @@ async function runStreamCheck() {
   const status = $("streamStatus");
   const items = streamFilteredItems();
   if (!items.length) {
-    if (status) status.textContent = "No titles match that genre, subgenre, or search. Nothing was checked.";
+    if (status) status.textContent = streamIsAny()
+      ? "Type a title first. Nothing was checked."
+      : "No titles match that genre, subgenre, or search. Nothing was checked.";
     if (btn) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
     renderStream();
     return;
@@ -2687,12 +2745,16 @@ function queueRenderStream() {
   clearTimeout(streamRenderTimer);
   streamRenderTimer = setTimeout(renderStream, 80);
 }
+function syncStreamSearchHint() {
+  if ($("streamQ")) $("streamQ").placeholder = streamIsAny() ? "Search any title" : "Title, year, genre, director, date";
+}
 function wireStream() {
-  ["streamSource","streamAvail","streamGenre","streamSub","streamHomo","streamSort"].forEach(id => {
+  ["streamAvail","streamGenre","streamSub","streamHomo","streamSort"].forEach(id => {
     const el = $(id);
     if (el) el.onchange = () => renderStream();
   });
-  if ($("streamQ")) $("streamQ").oninput = () => queueRenderStream();
+  if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); if (streamIsAny()) queueStreamAny(); renderStream(); };
+  if ($("streamQ")) $("streamQ").oninput = () => { queueRenderStream(); if (streamIsAny()) queueStreamAny(); };
   if ($("streamCheck")) $("streamCheck").onclick = () => runStreamCheck();
   loadStreamCache().then(() => { if (currentSection === "stream") renderStream(); });
 }
