@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.005</title>
+<title>Movie Desk 0.9.006</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.005</h1>
+  <h1>Movie Desk 0.9.006</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -225,7 +225,7 @@
     <div class="svc" id="streamOther"></div>
     <div class="section-label">Rent or buy</div>
     <div class="svc" id="streamShop"></div>
-    <div class="sub" style="margin-bottom:8px">Watchlist and ratings only check titles that already match. Anything searches any title you type. US availability.</div>
+    <div class="sub" style="margin-bottom:8px">Watchlist and ratings only check titles that already match. Anything can be a title, cast name, year, genre, or subgenre on its own. Only those matches are checked. US availability.</div>
     <label class="fld">Genre
       <select id="streamGenre">
         <option value="">All genres</option>
@@ -2385,6 +2385,7 @@ function streamChecked() {
 function streamKey(item) {
   const id = String(item.imdbId || "").trim();
   if (id) return id;
+  if (item && item.tmdbId) return "t:" + (item.tmdbKind === "tv" ? "tv" : "movie") + ":" + item.tmdbId;
   return "n:" + norm(item.title || "") + ":" + String(item.year || "");
 }
 function inventoryIndex() {
@@ -2469,54 +2470,202 @@ function streamFilteredItems() {
   const any = streamIsAny();
   return streamSourceItems().filter(item => {
     if (q && !any && streamHay(item).indexOf(q) < 0) return false;
-    if (!itemHasGenre(item, genre)) return false;
-    if (!itemHasGenre(item, subg)) return false;
+    if (!any && !itemHasGenre(item, genre)) return false;
+    if (!any && !itemHasGenre(item, subg)) return false;
     if (!streamPassesOwn(item)) return false;
     return true;
   });
 }
 let streamAny = [];
+let streamAnyNote = "";
 let streamAnySeq = 0;
 let streamAnyCtrl = null;
 let streamAnyTimer = 0;
+const TMDB_MOVIE_GENRE = { Action: 28, Adventure: 12, Animation: 16, Comedy: 35, Crime: 80, Documentary: 99, Drama: 18, Family: 10751, Fantasy: 14, History: 36, Horror: 27, Music: 10402, Mystery: 9648, Romance: 10749, "Sci-Fi": 878, Thriller: 53, War: 10752, Western: 37 };
+const TMDB_TV_GENRE = { Action: 10759, Adventure: 10759, Animation: 16, Comedy: 35, Crime: 80, Documentary: 99, Drama: 18, Family: 10751, Fantasy: 10765, Mystery: 9648, News: 10763, "Reality-TV": 10764, "Sci-Fi": 10765, "Talk-Show": 10767, War: 10768, Western: 37 };
+const GENRE_BY_ID = { 28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime", 99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History", 27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Sci-Fi", 53: "Thriller", 10752: "War", 37: "Western", 10759: "Action", 10765: "Sci-Fi", 10768: "War", 10763: "News", 10764: "Reality-TV", 10767: "Talk-Show" };
+const STREAM_SKIP_OPEN = { adult: 1, eroticthriller: 1, steamyromance: 1 };
+const tmdbKeywordCache = {};
 function queueStreamAny() {
   clearTimeout(streamAnyTimer);
   if (!streamIsAny()) return;
   streamAnyTimer = setTimeout(loadStreamAny, 300);
 }
+function parseAnyQuery(raw) {
+  const s = String(raw || "").trim();
+  let text = s, year = "", month = "", day = "";
+  const iso = s.match(/^((19|20)\d{2})(?:-(\d{2})(?:-(\d{2}))?)?$/);
+  if (iso) {
+    text = ""; year = iso[1]; month = iso[3] || ""; day = iso[4] || "";
+  } else {
+    const trail = s.match(/^(.*?)(?:\s+|,\s*)((19|20)\d{2})$/);
+    if (trail && trail[1].trim().length >= 2) { text = trail[1].trim(); year = trail[2]; }
+  }
+  if (text.length < 2) text = "";
+  let dayStart = "", dayEnd = "";
+  if (year && month && day) { dayStart = year + "-" + month + "-" + day; dayEnd = dayStart; }
+  else if (year && month) {
+    dayStart = year + "-" + month + "-01";
+    const n = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+    dayEnd = year + "-" + month + "-" + String(n).padStart(2, "0");
+  }
+  return { text: text, year: year, dayStart: dayStart, dayEnd: dayEnd };
+}
+function tmdbItem(row, kind, extra, castName) {
+  const date = row.release_date || row.first_air_date || "";
+  const names = [];
+  const add = g => { const t = String(g || "").trim(); if (t && !names.some(n => sameGenre(n, t))) names.push(t); };
+  (row.genre_ids || []).forEach(id => add(GENRE_BY_ID[id]));
+  splitGenreTags(extra).forEach(add);
+  return {
+    title: row.title || row.name || "",
+    imdbId: "",
+    tmdbId: row.id,
+    tmdbKind: kind,
+    year: date ? date.slice(0, 4) : "",
+    type: kind === "tv" ? "tvSeries" : "movie",
+    imdbRating: "",
+    yours: "",
+    genres: names.join(", "),
+    director: "",
+    cast: castName || "",
+    runtime: "",
+    date: date,
+    released: date
+  };
+}
+async function tmdbGet(path, params, signal) {
+  let url = "https://api.themoviedb.org/3" + path + "?api_key=" + encodeURIComponent(TMDB_KEY);
+  Object.keys(params || {}).forEach(k => {
+    if (params[k] !== "" && params[k] != null) url += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  });
+  const res = await fetch(url, signal ? { signal: signal } : {});
+  if (res.status === 429) throw new Error("429");
+  if (!res.ok) throw new Error("bad");
+  return res.json();
+}
+async function tmdbKeywordId(name, signal) {
+  const key = genreKeyName(name);
+  if (!key) return "";
+  if (tmdbKeywordCache[key]) return tmdbKeywordCache[key];
+  const d = await tmdbGet("/search/keyword", { query: name }, signal);
+  const rows = (d && d.results) || [];
+  const hit = rows.find(r => genreKeyName(r.name) === key) || rows[0];
+  const id = hit && hit.id ? String(hit.id) : "";
+  if (id) tmdbKeywordCache[key] = id;
+  return id;
+}
+async function discoverKind(kind, genreId, keywordId, parsed, signal) {
+  const params = { sort_by: "popularity.desc", include_adult: "false", page: "1" };
+  if (genreId) params.with_genres = String(genreId);
+  if (keywordId) params.with_keywords = String(keywordId);
+  if (parsed.dayStart) {
+    const prefix = kind === "tv" ? "first_air_date" : "primary_release_date";
+    params[prefix + ".gte"] = parsed.dayStart;
+    params[prefix + ".lte"] = parsed.dayEnd;
+  } else if (parsed.year) {
+    params[kind === "tv" ? "first_air_date_year" : "primary_release_year"] = parsed.year;
+  }
+  const d = await tmdbGet(kind === "tv" ? "/discover/tv" : "/discover/movie", params, signal);
+  return ((d && d.results) || []).filter(r => r && (r.title || r.name) && !r.adult).slice(0, 10);
+}
+function keepTextRow(row, kind, genre, movieGenre, tvGenre) {
+  if (!genre) return true;
+  if (kind === "tv") {
+    if (!tvGenre) return false;
+    return (row.genre_ids || []).map(String).indexOf(String(tvGenre)) >= 0;
+  }
+  if (!movieGenre) return !tvGenre;
+  return (row.genre_ids || []).map(String).indexOf(String(movieGenre)) >= 0;
+}
 async function loadStreamAny() {
-  const q = (($("streamQ") && $("streamQ").value) || "").trim();
+  const parsed = parseAnyQuery(($("streamQ") && $("streamQ").value) || "");
+  const genre = ($("streamGenre") && $("streamGenre").value) || "";
+  const subg = ($("streamSub") && $("streamSub").value) || "";
   const seq = ++streamAnySeq;
   if (streamAnyCtrl) streamAnyCtrl.abort();
-  if (q.length < 2) {
+  const paint = () => { if (seq === streamAnySeq && currentSection === "stream") renderStream(); };
+  if (STREAM_SKIP_OPEN[genreKeyName(genre)] || STREAM_SKIP_OPEN[genreKeyName(subg)]) {
     streamAny = [];
-    if (currentSection === "stream") renderStream();
+    streamAnyNote = "That category is not searched.";
+    paint();
     return;
   }
+  if (!parsed.text && !parsed.year && !genre && !subg) {
+    streamAny = [];
+    streamAnyNote = "";
+    paint();
+    return;
+  }
+  streamAny = [];
+  streamAnyNote = "Searching...";
+  paint();
   streamAnyCtrl = typeof AbortController === "function" ? new AbortController() : null;
+  const signal = streamAnyCtrl ? streamAnyCtrl.signal : undefined;
   try {
-    const res = await fetch("https://www.omdbapi.com/?s=" + encodeURIComponent(q) + "&page=1&apikey=" + OMDB_KEY, streamAnyCtrl ? { signal: streamAnyCtrl.signal } : {});
+    const movieGenre = TMDB_MOVIE_GENRE[genre] || 0;
+    const tvGenre = TMDB_TV_GENRE[genre] || 0;
+    const keywordName = subg || ((!movieGenre && !tvGenre && genre) ? genre : "");
+    const keywordId = keywordName ? await tmdbKeywordId(keywordName, signal) : "";
     if (seq !== streamAnySeq) return;
-    const d = await res.json();
-    const rows = (d && d.Search) || [];
-    streamAny = rows.filter(m => m && m.Title && !RATING_SKIP[String(m.Type || "").toLowerCase()]).slice(0, 10).map(m => ({
-      title: m.Title,
-      imdbId: m.imdbID || "",
-      year: m.Year || "",
-      type: m.Type || "",
-      imdbRating: "",
-      yours: "",
-      genres: "",
-      director: "",
-      runtime: "",
-      date: "",
-      released: ""
-    }));
+    const extra = [genre, subg].filter(Boolean).join(", ");
+    let rows = [];
+    if (!parsed.text) {
+      if (keywordName && !keywordId && !movieGenre && !tvGenre) {
+        streamAny = [];
+        streamAnyNote = "No open list for that.";
+        paint();
+        return;
+      }
+      const browseMovie = !!movieGenre || (!tvGenre && !!(keywordId || parsed.year || parsed.dayStart));
+      const browseTv = !!tvGenre || (!movieGenre && !!(keywordId || parsed.year || parsed.dayStart));
+      if (browseMovie) (await discoverKind("movie", movieGenre, keywordId, parsed, signal)).forEach(r => rows.push(tmdbItem(r, "movie", extra, "")));
+      if (seq !== streamAnySeq) return;
+      if (browseTv) (await discoverKind("tv", tvGenre, keywordId, parsed, signal)).forEach(r => rows.push(tmdbItem(r, "tv", extra, "")));
+    } else {
+      const movieParams = { query: parsed.text, include_adult: "false", page: "1" };
+      const tvParams = { query: parsed.text, include_adult: "false", page: "1" };
+      if (parsed.year && !parsed.dayStart) { movieParams.year = parsed.year; tvParams.first_air_date_year = parsed.year; }
+      const found = await Promise.all([
+        tmdbGet("/search/movie", movieParams, signal),
+        tmdbGet("/search/tv", tvParams, signal),
+        tmdbGet("/search/person", { query: parsed.text, include_adult: "false", page: "1" }, signal)
+      ]);
+      if (seq !== streamAnySeq) return;
+      const seen = new Set();
+      const add = item => {
+        if (!item.title || RATING_SKIP[String(item.type || "").toLowerCase()]) return;
+        const k = item.tmdbKind + ":" + item.tmdbId;
+        if (seen.has(k)) return;
+        seen.add(k);
+        rows.push(item);
+      };
+      ((found[0] && found[0].results) || []).filter(r => r && !r.adult && keepTextRow(r, "movie", genre, movieGenre, tvGenre)).slice(0, 8).forEach(r => add(tmdbItem(r, "movie", "", "")));
+      ((found[1] && found[1].results) || []).filter(r => r && !r.adult && keepTextRow(r, "tv", genre, movieGenre, tvGenre)).slice(0, 4).forEach(r => add(tmdbItem(r, "tv", "", "")));
+      const person = ((found[2] && found[2].results) || []).find(r => r && !r.adult);
+      if (person && rows.length < 20) {
+        const cred = await tmdbGet("/person/" + person.id + "/combined_credits", {}, signal);
+        if (seq !== streamAnySeq) return;
+        let cast = ((cred && cred.cast) || []).filter(r => r && (r.title || r.name) && !r.adult);
+        if (parsed.year) cast = cast.filter(r => String(r.release_date || r.first_air_date || "").slice(0, 4) === parsed.year);
+        cast.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        cast.slice(0, 10).forEach(r => {
+          const kind = r.media_type === "tv" ? "tv" : "movie";
+          if (!keepTextRow(r, kind, genre, movieGenre, tvGenre)) return;
+          add(tmdbItem(r, kind, "", person.name || parsed.text));
+        });
+      }
+    }
+    if (seq !== streamAnySeq) return;
+    streamAny = rows.filter(r => r && r.title).slice(0, 20);
+    streamAnyNote = streamAny.length ? "" : "Nothing found.";
   } catch (e) {
     if (e && e.name === "AbortError") return;
-    if (seq === streamAnySeq) streamAny = [];
+    if (seq !== streamAnySeq) return;
+    streamAny = [];
+    streamAnyNote = String(e && e.message) === "429" ? "Lookup was busy. Try again." : "Search failed.";
   }
-  if (seq === streamAnySeq && currentSection === "stream") renderStream();
+  paint();
 }
 function streamSourceItems() {
   const src = ($("streamSource") && $("streamSource").value) || "watch";
@@ -2613,7 +2762,8 @@ async function loadStreamCache() {
 async function fetchStream(item) {
   let kind = "movie";
   let id = null;
-  if (item.imdbId) {
+  if (item.tmdbId) { id = item.tmdbId; kind = item.tmdbKind === "tv" ? "tv" : "movie"; }
+  else if (item.imdbId) {
     const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(item.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
     if (res.status === 429) throw new Error("429");
     const d = await res.json();
@@ -2669,10 +2819,8 @@ function renderStream() {
   const box = $("streamOut");
   if (!box) return;
   if (!items.length) {
-    if (streamIsAny()) {
-      const typed = (($("streamQ") && $("streamQ").value) || "").trim();
-      box.innerHTML = "<div style='color:#777'>" + (typed.length < 2 ? "Type a title to search any movie or show." : "No titles found.") + "</div>";
-    } else box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
+    if (streamIsAny()) box.innerHTML = "<div style='color:#777'>" + escWatch(streamAnyNote || "Type a title, cast name, or year, or pick a genre or subgenre.") + "</div>";
+    else box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
     return;
   }
   box.innerHTML = shown.map(item => {
@@ -2684,6 +2832,7 @@ function renderStream() {
     const tags = genreTagHtml(streamGenreNames(item).join(", "));
     return '<div class="stream-row"><b>' + escWatch(item.title) + '</b>'
       + (item.year ? ' <span class="sub">(' + escWatch(item.year) + ')</span>' : '')
+      + (item.cast ? ' <span class="sub">· ' + escWatch(item.cast) + '</span>' : '')
       + '<span class="sub">' + extra + '</span>' + looked
       + (tags ? '<div class="stream-hits">' + tags + '</div>' : '')
       + (badges ? '<div class="stream-hits">' + badges + '</div>' : '')
@@ -2701,7 +2850,7 @@ async function runStreamCheck() {
   const items = streamFilteredItems();
   if (!items.length) {
     if (status) status.textContent = streamIsAny()
-      ? "Type a title first. Nothing was checked."
+      ? "Add a title, cast, year, genre, or subgenre first. Nothing was checked."
       : "No titles match that genre, subgenre, or search. Nothing was checked.";
     if (btn) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
     renderStream();
@@ -2746,12 +2895,16 @@ function queueRenderStream() {
   streamRenderTimer = setTimeout(renderStream, 80);
 }
 function syncStreamSearchHint() {
-  if ($("streamQ")) $("streamQ").placeholder = streamIsAny() ? "Search any title" : "Title, year, genre, director, date";
+  if ($("streamQ")) $("streamQ").placeholder = streamIsAny() ? "Title, cast, or year" : "Title, year, genre, director, date";
 }
 function wireStream() {
-  ["streamAvail","streamGenre","streamSub","streamHomo","streamSort"].forEach(id => {
+  ["streamAvail","streamHomo","streamSort"].forEach(id => {
     const el = $(id);
     if (el) el.onchange = () => renderStream();
+  });
+  ["streamGenre","streamSub"].forEach(id => {
+    const el = $(id);
+    if (el) el.onchange = () => { if (streamIsAny()) queueStreamAny(); renderStream(); };
   });
   if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); if (streamIsAny()) queueStreamAny(); renderStream(); };
   if ($("streamQ")) $("streamQ").oninput = () => { queueRenderStream(); if (streamIsAny()) queueStreamAny(); };
