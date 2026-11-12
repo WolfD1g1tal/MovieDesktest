@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.007</title>
+<title>Movie Desk 0.9.011</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.007</h1>
+  <h1>Movie Desk 0.9.011</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -142,7 +142,7 @@
           <option value="no">No boutique</option>
         </select>
       </label>
-      <label>Homo scenes
+      <label>ss
         <select id="filterHomo">
           <option value="">All</option>
           <option value="yes">Yes</option>
@@ -442,7 +442,7 @@
         <option value="Zombie Horror">Zombie Horror</option>
       </select>
     </label>
-    <label class="fld">Homo scenes
+    <label class="fld">ss
       <select id="streamHomo">
         <option value="">All</option>
         <option value="yes">Yes</option>
@@ -487,6 +487,11 @@
     <div id="settingsOut" style="margin-top:12px;"></div>
     </div>
     <div id="setLook" style="display:none">
+      <div class="section-label">SS flag</div>
+      <label style="display:flex;align-items:center;gap:8px;margin:8px 0 16px">
+        <input type="checkbox" id="ssOnCard">
+        <span>Show ss on inventory cards</span>
+      </label>
       <div class="section-label">Disc badges</div>
       <div class="sub" style="margin-bottom:10px">Gold for 4K. Blue chrome for Blu-ray. Silver chrome for DVD. Each one has three effects.</div>
       <div id="badgeAppearance"></div>
@@ -514,6 +519,10 @@
     <label style="display:block;margin:6px 0">Cinematographer<br><input type="text" id="editCinematographer" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Cover URL<br><input type="text" id="editCoverUrl" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Notes<br><input type="text" id="editNotes" style="width:100%;height:36px"></label>
+    <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
+      <input type="checkbox" id="editSs">
+      <span>ss</span>
+    </label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="editSave">Save</button>
       <button id="editCancel" style="background:#333">Cancel</button>
@@ -1992,11 +2001,11 @@ function render() {
           ${childDrop}
           ${pkgNote}
           ${boutNote}
-          <span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">Homo: ${isYes?"yes":"no"}</span>
           <span class="flag ${guideFlags[key]?"guide-yes":"guide-no"}" data-guide="${key}">Guide: ${guideFlags[key]?"yes":"no"}</span>
           <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
           ${ratingBadge(m)}
         </div>
+        ${ssOnCard() ? `<div class="card-ss" style="margin-top:6px;"><span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">ss: ${isYes?"yes":"no"}</span></div>` : ""}
       </div>
     </div>`;
   }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
@@ -2077,6 +2086,8 @@ function openEdit(id) {
   $("editCinematographer").value = m.cinematographer || "";
   $("editNotes").value = m.notes || "";
   $("editCoverUrl").value = m.coverUrl || "";
+  const key = homoKey(m);
+  $("editSs").checked = !!homoFlags[key];
   $("editPanel").dataset.id = id;
   $("editPanel").classList.add("show");
 }
@@ -2102,6 +2113,10 @@ $("editSave").onclick = () => {
   m.cinematographer = ($("editCinematographer").value || "").trim();
   m.notes = ($("editNotes").value || "").trim();
   m.coverUrl = ($("editCoverUrl").value || "").trim();
+  const key = homoKey(m);
+  if ($("editSs").checked) homoFlags[key] = true;
+  else delete homoFlags[key];
+  saveHomo();
   delete m._blob;
   delete m._ysrc;
   if (manualTitles.some(x => x.id === id)) saveManual();
@@ -2111,7 +2126,19 @@ $("editSave").onclick = () => {
 };
 $("editCancel").onclick = () => $("editPanel").classList.remove("show");
 
-function wireClear(fieldId, clearId) {
+function ssOnCard() {
+  return localStorage.getItem("md_ss_on_card") === "1";
+}
+function wireSsSetting() {
+  const el = $("ssOnCard");
+  if (!el) return;
+  el.checked = ssOnCard();
+  el.onchange = () => {
+    localStorage.setItem("md_ss_on_card", el.checked ? "1" : "0");
+    if (currentSection === "inventory") render();
+  };
+}
+wireSsSetting();
   const field = $(fieldId), x = $(clearId);
   if (!field || !x) return;
   const toggle = () => { x.style.display = field.value ? "block" : "none"; };
@@ -2328,7 +2355,7 @@ function showSection(name) {
   });
   if (name === "inventory") render();
   if (name === "watch") renderWatch();
-  if (name === "stream") renderStream();
+  if (name === "stream") clearStreamDisplay();
   if (name === "settings") showSettings();
 }
 
@@ -2918,19 +2945,40 @@ function queueRenderStream() {
 function syncStreamSearchHint() {
   if ($("streamQ")) $("streamQ").placeholder = streamIsAny() ? "Title, cast, or year" : "Title, year, genre, director, date";
 }
+function clearStreamDisplay() {
+  const box = $("streamOut");
+  if (box) box.innerHTML = "";
+  const status = $("streamStatus");
+  if (status) status.textContent = "";
+  streamAny = [];
+  streamAnyNote = "";
+  streamSearched = false;
+  if (streamAnyCtrl) { try { streamAnyCtrl.abort(); } catch (e) {} streamAnyCtrl = null; }
+  clearTimeout(streamAnyTimer);
+  streamToken++;
+}
+let streamSearched = false;
 function wireStream() {
   ["streamHomo","streamSort"].forEach(id => {
     const el = $(id);
-    if (el) el.onchange = () => renderStream();
+    if (el) el.onchange = () => { if (streamSearched) renderStream(); };
   });
   ["streamGenre","streamSub"].forEach(id => {
     const el = $(id);
-    if (el) el.onchange = () => { queueStreamAny(); renderStream(); };
+    if (el) el.onchange = () => { clearStreamDisplay(); };
   });
-  if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); if (streamIsAny()) queueStreamAny(); renderStream(); };
-  if ($("streamQ")) $("streamQ").oninput = () => { queueRenderStream(); if (streamIsAny()) queueStreamAny(); };
-  if ($("streamCheck")) $("streamCheck").onclick = () => runStreamCheck();
-  loadStreamCache().then(() => { if (currentSection === "stream") renderStream(); });
+  if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); clearStreamDisplay(); };
+  if ($("streamQ")) $("streamQ").oninput = () => { /* wait for Check button */ };
+  if ($("streamCheck")) $("streamCheck").onclick = () => {
+    streamSearched = true;
+    if (streamIsAny() || streamGenreValue() || streamSubValue()) {
+      clearTimeout(streamAnyTimer);
+      loadStreamAny().then(() => runStreamCheck());
+    } else {
+      runStreamCheck();
+    }
+  };
+  loadStreamCache().then(() => { if (currentSection === "stream") clearStreamDisplay(); });
 }
 wireStream();
 
