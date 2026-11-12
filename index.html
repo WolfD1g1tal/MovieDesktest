@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.012</title>
+<title>Movie Desk 0.9.014</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.012</h1>
+  <h1>Movie Desk 0.9.014</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -1821,10 +1821,61 @@ function saveBadgeFx(map) { localStorage.setItem("md_badge_fx", JSON.stringify(m
 function discBadge(bucket, fxMap) {
   if (bucket !== "uhd" && bucket !== "blu" && bucket !== "dvd") return "";
   const fx = (fxMap && fxMap[bucket]) || "polish";
-  const text = bucket === "uhd" ? "4K" : bucket === "blu" ? "BLU" : "DVD";
-  const tip = bucket === "uhd" ? "4K" : bucket === "blu" ? "Blu-ray" : "DVD";
   const safeFx = (fx === "shimmer" || fx === "glow") ? fx : "polish";
-  return '<span class="disc-badge kind-' + bucket + ' fx-' + safeFx + '" title="' + tip + '"><span class="disc-face">' + text + '</span></span>';
+  const gid = "gb" + Math.random().toString(36).slice(2, 8);
+  const gid2 = gid + "t";
+  if (bucket === "uhd") {
+    return '<span class="disc-badge kind-uhd fx-' + safeFx + '" title="4K" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<defs>'
+      + '<linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#ffe7a3"/><stop offset="35%" stop-color="#e7c56b"/><stop offset="70%" stop-color="#a97812"/><stop offset="100%" stop-color="#5c430e"/>'
+      + '</linearGradient>'
+      + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#fff6d4"/><stop offset="50%" stop-color="#c9a227"/><stop offset="100%" stop-color="#6e4e10"/>'
+      + '</linearGradient>'
+      + '</defs>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#3a2706" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="900" fill="url(#' + gid2 + ')">4K</text>'
+      + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#3a2706" letter-spacing="1">ULTRA HD</text>'
+      + '</svg></span>';
+  }
+  if (bucket === "blu") {
+    return '<span class="disc-badge kind-blu fx-' + safeFx + '" title="Blu-ray" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<defs>'
+      + '<linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#8ec4f2"/><stop offset="35%" stop-color="#1a6aaf"/><stop offset="70%" stop-color="#0b3a6c"/><stop offset="100%" stop-color="#082848"/>'
+      + '</linearGradient>'
+      + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#f7fbff"/><stop offset="50%" stop-color="#8ec4f2"/><stop offset="100%" stop-color="#1a6aaf"/>'
+      + '</linearGradient>'
+      + '</defs>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#082848" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="900" fill="url(#' + gid2 + ')">BLU</text>'
+      + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#f4f9ff" letter-spacing="1">RAY</text>'
+      + '</svg></span>';
+  }
+  if (bucket === "dvd") {
+    return '<span class="disc-badge kind-dvd fx-' + safeFx + '" title="DVD" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<defs>'
+      + '<linearGradient id="' + gid + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#ffffff"/><stop offset="35%" stop-color="#d8dee5"/><stop offset="70%" stop-color="#8e969e"/><stop offset="100%" stop-color="#4e545a"/>'
+      + '</linearGradient>'
+      + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
+      + '<stop offset="0%" stop-color="#ffffff"/><stop offset="50%" stop-color="#d8dee5"/><stop offset="100%" stop-color="#8e969e"/>'
+      + '</linearGradient>'
+      + '</defs>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#2c3136" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="900" fill="url(#' + gid2 + ')">DVD</text>'
+      + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#2c3136" letter-spacing="1">VIDEO</text>'
+      + '</svg></span>';
+  }
+  return "";
 }
 function discBucket(m) {
   const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
