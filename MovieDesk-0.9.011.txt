@@ -1,0 +1,3310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Movie Desk 0.9.011</title>
+<style>
+  body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
+  header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
+  h1 { margin: 0; }
+  .sub { color: #888; font-size: 0.8rem; }
+  main { padding: 16px; max-width: 680px; margin: 0 auto; }
+  input[type=search], input[type=text] { width: 100%; padding: 14px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #fff; margin: 6px 0; box-sizing: border-box; }
+  .add-wrap, .buy-wrap { position: relative; margin-bottom: 8px; }
+  .add-row, .buy-row { display: flex; gap: 8px; align-items: center; }
+  .add-row input, .buy-row input { flex: 1; margin: 0; }
+  button { background: #222; color: #eee; border: 1px solid #444; padding: 0 16px; border-radius: 12px; cursor: pointer; height: 48px; }
+  .suggest, .buy-results { position: absolute; top: 100%; left: 0; right: 0; background: #1a1a1a; border: 1px solid #333; border-radius: 8px; max-height: 220px; overflow-y: auto; -webkit-overflow-scrolling: touch; z-index: 20; display: none; }
+  .suggest.show, .buy-results.show { display: block; }
+  .suggest div, .buy-results div { padding: 12px 14px; cursor: pointer; border-bottom: 1px solid #2a2a2a; }
+  .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
+  #scanner { display: none; margin: 12px 0; }
+  #scanner video { width: 100%; border-radius: 12px; background: #000; }
+  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; content-visibility: auto; contain-intrinsic-size: auto 204px; }
+  .card-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 6px; background: #222; flex-shrink: 0; }
+  .card-body { flex: 1; min-width: 0; }
+  .card-title { font-weight: 500; font-size: 1.05rem; margin: 0 0 2px; cursor: pointer; }
+  .card-meta { color: #aaa; font-size: 0.8rem; margin: 2px 0 6px; }
+  .card-added { color: #777; font-size: 0.72rem; margin: 0 0 6px; }
+  .card-flags { display: flex; flex-wrap: wrap; gap: 6px; }
+  .nav { display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0; }
+  .nav button { flex: 1 1 30%; height: 40px; font-size: 0.78rem; }
+  .svc { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 10px; }
+  .svc label { display: flex; align-items: center; gap: 6px; background: #1a1a1a; border: 1px solid #333; border-radius: 999px; padding: 6px 10px; font-size: 0.78rem; cursor: pointer; max-width: 100%; }
+  .svc label.on { border-color: #7dcea0; color: #7dcea0; }
+  .svc input { margin: 0; }
+  .stream-row { padding: 10px 0; border-bottom: 1px solid #222; content-visibility: auto; contain-intrinsic-size: auto 52px; }
+  .stream-hits { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+  #secStream label.fld { display: block; color: #aaa; font-size: 0.8rem; margin: 6px 0; }
+  #secStream label.fld select, #secStream .tool-row select { width: 100%; height: 40px; margin-top: 4px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; box-sizing: border-box; }
+  #secStream .tool-row { flex-wrap: wrap; }
+  #secStream .tool-row select { flex: 1 1 140px; width: auto; }
+  #streamCheck { flex: 1 1 160px; height: 40px; }
+  .nav button.active { background: #333; border-color: #666; }
+  .tool-row { display: flex; gap: 8px; margin: 8px 0; }
+  .tool-row select { flex: 1; height: 40px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; padding: 0 8px; }
+  #filterBtn.on { border-color: #8ab4f8; color: #8ab4f8; }
+  .filter-panel { display: none; background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 10px; margin-bottom: 10px; }
+  .filter-panel.open { display: block; }
+  .filter-panel label { display: block; color: #aaa; font-size: 0.8rem; margin: 6px 0; }
+  .filter-panel select { width: 100%; height: 40px; margin-top: 4px; border-radius: 12px; border: 1px solid #333; background: #1a1a1a; color: #eee; padding: 0 8px; }
+  .section { display: none; }
+  .section.active { display: block; }
+  .watch-row { padding: 8px 0; border-bottom: 1px solid #222; content-visibility: auto; contain-intrinsic-size: auto 40px; }
+  .child-list { margin-top: 8px; margin-left: 24px; border-left: 2px solid #6a3a8a; padding-left: 10px; display: none; }
+  .child-list.show { display: block; }
+  .child-item { background: #2a1a3a; border: 1px solid #5a3a7a; border-radius: 6px; padding: 8px; margin: 4px 0; color: #d0a0e0; }
+  .flag { padding: 4px 10px; border-radius: 999px; font-size: 0.78rem; font-weight: 600; }
+  .own { background: #1a3a2a; color: #7dcea0; }
+  .gay-no { background: #1a2a3a; color: #8ab4e0; cursor: pointer; }
+  .gay-yes { background: #3a1a2a; color: #e08ab4; cursor: pointer; }
+  .guide-no { background: #2a2a2a; color: #bbb; cursor: pointer; }
+  .guide-yes { background: #3a2a10; color: #e0b060; cursor: pointer; }
+  .imdb { background: #2a2a1a; color: #e0c07a; }
+  .you { background: #0a2a2a; color: #00e5ff; }
+  .pkg { background: #2a1a2a; color: #e0a07a; }
+  .child-drop { background: #2a1a3a; color: #e0a0ff; border: 1px solid #5a3a7a; border-radius: 8px; padding: 4px; font-size: 0.85rem; font-weight: 600; width: 100%; max-width: 320px; height: auto; }
+  .child-list { margin-top: 8px; border-top: 1px solid #333; padding-top: 8px; }
+  .child-item { background: #222; border: 1px solid #444; border-radius: 6px; padding: 8px; margin: 4px 0; }
+  label.load { display: inline-block; background: #222; border: 1px solid #444; padding: 10px 14px; border-radius: 8px; cursor: pointer; margin-right: 8px; }
+  input[type=file] { display: none; }
+  .section-label { color: #888; font-size: 0.85rem; margin: 16px 0 4px; }
+  .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.7); display: none; align-items: center; justify-content: center; z-index: 9999; }
+  .modal.show { display: flex !important; }
+  .modal-box { background: #1a1a1a; border: 1px solid #333; border-radius: 16px; padding: 20px; max-width: 320px; width: 90%; }
+  .modal-box p { margin: 0 0 16px; white-space: pre-line; }
+  .modal-box label { display: block; margin: 8px 0; font-size: 0.9rem; }
+  .modal-box button { height: auto; background: #333; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; float: right; }
+
+  .disc-badge { display: inline-flex; align-items: center; justify-content: center; position: relative; overflow: hidden; height: 22px; min-width: 40px; padding: 0 8px; border-radius: 5px; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; line-height: 1; vertical-align: middle; box-shadow: inset 0 1px 0 rgba(255,255,255,.9), inset 0 -2px 3px rgba(0,0,0,.38), 0 1px 2px rgba(0,0,0,.55); }
+  .disc-face { position: relative; z-index: 1; }
+  .disc-badge::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 48%; background: linear-gradient(180deg, rgba(255,255,255,.62), rgba(255,255,255,0)); pointer-events: none; }
+  .kind-uhd { color: #3a2706; text-shadow: 0 1px 0 rgba(255,248,220,.75); background: linear-gradient(180deg, rgba(255,255,255,.45) 0%, rgba(255,255,255,0) 46%, rgba(70,40,0,.2) 100%), linear-gradient(108deg, #6e4e10 0%, #e7c56b 20%, #fff6d4 38%, #a97812 54%, #ffe7a3 72%, #5c430e 100%); }
+  .kind-blu { color: #f4f9ff; text-shadow: 0 1px 0 rgba(0,16,36,.6); background: linear-gradient(180deg, rgba(255,255,255,.42) 0%, rgba(255,255,255,0) 44%, rgba(0,12,28,.3) 100%), linear-gradient(108deg, #0b3a6c 0%, #8ec4f2 22%, #f7fbff 40%, #1a6aaf 56%, #d4ebff 74%, #082848 100%); }
+  .kind-dvd { color: #2c3136; text-shadow: 0 1px 0 rgba(255,255,255,.8); background: linear-gradient(180deg, rgba(255,255,255,.72) 0%, rgba(255,255,255,0) 46%, rgba(0,0,0,.22) 100%), linear-gradient(108deg, #5e646b 0%, #d8dee5 20%, #ffffff 40%, #8e969e 55%, #f4f6f8 73%, #4e545a 100%); }
+  .disc-badge.fx-shimmer::after { content: ""; position: absolute; top: -30%; bottom: -30%; width: 38%; left: 0; background: linear-gradient(90deg, transparent, rgba(255,255,255,.8), transparent); transform: translateX(-180%); animation: badge-sweep 3.2s ease-in-out infinite; pointer-events: none; }
+  .disc-badge.fx-glow::after { content: ""; position: absolute; inset: 0; background: radial-gradient(circle at 50% 35%, rgba(255,255,255,.7), transparent 68%); opacity: .2; animation: badge-glow 2.6s ease-in-out infinite; pointer-events: none; }
+  @keyframes badge-sweep { 0% { transform: translateX(-180%); } 100% { transform: translateX(430%); } }
+  @keyframes badge-glow { 0%, 100% { opacity: .12; } 50% { opacity: .9; } }
+  @media (prefers-reduced-motion: reduce) { .disc-badge.fx-shimmer::after, .disc-badge.fx-glow::after { animation: none; } }
+  .fx-group { margin: 0 0 14px; }
+  .fx-head { font-weight: 600; margin-bottom: 4px; }
+  .fx-choices { display: flex; flex-direction: column; gap: 6px; }
+  .fx-pick { height: auto; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 10px; background: #141414; border-radius: 10px; }
+  .fx-pick.on { border-color: #c9a227; background: #1c1a14; }
+  .fx-name { font-size: 0.85rem; line-height: 1.25; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Movie Desk 0.9.011</h1>
+  <div class="sub" id="counts">Ready</div>
+</header>
+<main>
+  <div class="nav">
+    <button id="tabInventory" class="active">Inventory</button>
+    <button id="tabAdd">Add</button>
+    <button id="tabWatch">Watchlist</button>
+    <button id="tabStream">Stream</button>
+    <button id="tabSettings">Settings</button>
+  </div>
+
+  <div id="secInventory" class="section active">
+    <input type="search" id="q" placeholder="Search your titles...">
+    <div class="tool-row">
+      <button type="button" id="filterBtn">Filter</button>
+      <select id="sortSel" aria-label="Sort">
+        <option value="added-new">Newest added</option>
+        <option value="added-old">Oldest added</option>
+        <option value="az">A–Z</option>
+        <option value="za">Z–A</option>
+        <option value="imdb">IMDb</option>
+        <option value="friend">Friend IMDb</option>
+        <option value="rel-new">Release newest</option>
+        <option value="rel-old">Release oldest</option>
+      </select>
+    </div>
+    <div id="filterPanel" class="filter-panel">
+      <label>Disc
+        <select id="filterDisc">
+          <option value="">All</option>
+          <option value="uhd">4K</option>
+          <option value="blu">Blu-ray</option>
+          <option value="dvd">DVD</option>
+          <option value="other">Other</option>
+        </select>
+      </label>
+      <label>Boutique
+        <select id="filterBout">
+          <option value="">All</option>
+          <option value="yes">Has boutique</option>
+          <option value="no">No boutique</option>
+        </select>
+      </label>
+      <label>ss
+        <select id="filterHomo">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </label>
+      <label>Parents guide
+        <select id="filterGuide">
+          <option value="">All</option>
+          <option value="yes">Yes</option>
+          <option value="no">No</option>
+        </select>
+      </label>
+      <button type="button" id="filterClear" style="height:36px;margin-top:8px;">Clear filters</button>
+    </div>
+    <div id="out"></div>
+  </div>
+
+  <div id="secAdd" class="section">
+    <div class="section-label">Add Mother (package / single title)</div>
+    <div class="add-wrap">
+      <div class="add-row">
+        <div style="position:relative;flex:1;display:flex;align-items:center;">
+          <input type="text" id="motherTitle" placeholder="Mother title or barcode..." autocomplete="off" style="flex:1;padding-right:28px;">
+          <span id="motherClear" style="position:absolute;right:8px;cursor:pointer;color:#888;font-size:0.85rem;display:none;">clear</span>
+        </div>
+        <button id="motherAddBtn">Add Mother</button>
+        <button id="motherScanBtn">Scan</button>
+      </div>
+      <div class="suggest" id="motherSuggest"></div>
+    </div>
+    <div class="section-label">Add Child to Mother</div>
+    <div id="lastIdBar" style="font-size:0.8rem;color:#aaa;margin:2px 0 8px;display:flex;align-items:center;gap:8px;">
+      <span id="lastIdText">Last ID: -</span>
+      <button id="lastIdCopy" style="height:22px;padding:0 8px;font-size:0.7rem;background:#333;border:1px solid #555;color:#fff;">Copy</button>
+    </div>
+    <div class="add-wrap">
+      <div class="add-row">
+        <input type="text" id="childTitle" placeholder="Child title or barcode..." autocomplete="off">
+        <input type="text" id="motherIdInput" placeholder="Mother ID" style="max-width:140px">
+        <button id="childAddBtn">Add Child</button>
+        <button id="childScanBtn">Scan</button>
+      </div>
+      <div class="suggest" id="childSuggest"></div>
+    </div>
+    <div id="barcodeStatus" style="display:none; font-size:0.75rem; color:#aaa; margin:6px 0 10px; padding:8px; background:#161616; border-radius:8px; border:1px solid #2a2a2a;"></div>
+    <div id="scanner"><video id="video" autoplay playsinline></video></div>
+  </div>
+
+  <div id="secWatch" class="section">
+    <div id="watchControls">
+      <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;">
+        <label class="load">Upload Personal Watchlist<input type="file" id="myWatch" accept=".csv,.txt"></label>
+        <label class="load">Upload Friend Watchlist<input type="file" id="friendWatch" accept=".csv,.txt"></label>
+        <button id="watchModePersonal" style="height:28px;padding:0 10px;font-size:0.75rem;">Personal</button>
+        <button id="watchModeFriend" style="height:28px;padding:0 10px;font-size:0.75rem;">Friend</button>
+        <button id="watchShared" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;">Shared</button>
+      </div>
+      <input type="search" id="watchQ" placeholder="Find on watchlist" autocomplete="off">
+    </div>
+    <div id="sectionOut" style="font-size:0.85rem;color:#ccc;margin:6px 0 10px;"></div>
+  </div>
+
+  <div id="secStream" class="section">
+    <div class="tool-row">
+      <select id="streamSource" aria-label="List">
+        <option value="watch">Watchlist</option>
+        <option value="ratings">My ratings</option>
+        <option value="any">Anything</option>
+      </select>
+    </div>
+    <div class="section-label">Your services</div>
+    <div class="svc" id="streamYours"></div>
+    <div class="section-label">Other subscriptions</div>
+    <div class="svc" id="streamOther"></div>
+    <div class="section-label">Rent or buy</div>
+    <div class="svc" id="streamShop"></div>
+    <div class="sub" style="margin-bottom:8px">A genre or subgenre searches on its own. A check only looks at the services you selected, and each title names that service. US availability.</div>
+    <label class="fld">Genre
+      <select id="streamGenre">
+        <option value="">All genres</option>
+        <option value="Action">Action</option>
+        <option value="Adult">Adult</option>
+        <option value="Adventure">Adventure</option>
+        <option value="Animation">Animation</option>
+        <option value="Biography">Biography</option>
+        <option value="Comedy">Comedy</option>
+        <option value="Crime">Crime</option>
+        <option value="Documentary">Documentary</option>
+        <option value="Drama">Drama</option>
+        <option value="Family">Family</option>
+        <option value="Fantasy">Fantasy</option>
+        <option value="Film Noir">Film Noir</option>
+        <option value="Game Show">Game Show</option>
+        <option value="History">History</option>
+        <option value="Holiday">Holiday</option>
+        <option value="Horror">Horror</option>
+        <option value="Lifestyle">Lifestyle</option>
+        <option value="Music">Music</option>
+        <option value="Musical">Musical</option>
+        <option value="Mystery">Mystery</option>
+        <option value="News">News</option>
+        <option value="Reality-TV">Reality-TV</option>
+        <option value="Romance">Romance</option>
+        <option value="Sci-Fi">Sci-Fi</option>
+        <option value="Short">Short</option>
+        <option value="Sport">Sport</option>
+        <option value="Talk-Show">Talk-Show</option>
+        <option value="Thriller">Thriller</option>
+        <option value="War">War</option>
+        <option value="Western">Western</option>
+      </select>
+    </label>
+    <label class="fld">Subgenre
+      <select id="streamSub">
+        <option value="">All subgenres</option>
+        <option value="Action Epic">Action Epic</option>
+        <option value="Adult Animation">Adult Animation</option>
+        <option value="Adventure Epic">Adventure Epic</option>
+        <option value="Alien Invasion">Alien Invasion</option>
+        <option value="Animal Adventure">Animal Adventure</option>
+        <option value="Anime">Anime</option>
+        <option value="Artificial Intelligence">Artificial Intelligence</option>
+        <option value="B-Action">B-Action</option>
+        <option value="Baseball">Baseball</option>
+        <option value="Basketball">Basketball</option>
+        <option value="Beauty Competition">Beauty Competition</option>
+        <option value="Beauty Makeover">Beauty Makeover</option>
+        <option value="B-Horror">B-Horror</option>
+        <option value="Body Horror">Body Horror</option>
+        <option value="Body Swap Comedy">Body Swap Comedy</option>
+        <option value="Boxing">Boxing</option>
+        <option value="Buddy Comedy">Buddy Comedy</option>
+        <option value="Buddy Cop">Buddy Cop</option>
+        <option value="Bumbling Detective">Bumbling Detective</option>
+        <option value="Business Reality TV">Business Reality TV</option>
+        <option value="Caper">Caper</option>
+        <option value="Car Action">Car Action</option>
+        <option value="Classical Musical">Classical Musical</option>
+        <option value="Classical Western">Classical Western</option>
+        <option value="Coming-of-Age">Coming-of-Age</option>
+        <option value="Computer Animation">Computer Animation</option>
+        <option value="Concert">Concert</option>
+        <option value="Conspiracy Thriller">Conspiracy Thriller</option>
+        <option value="Contemporary Western">Contemporary Western</option>
+        <option value="Cooking & Food">Cooking & Food</option>
+        <option value="Cooking Competition">Cooking Competition</option>
+        <option value="Cop Drama">Cop Drama</option>
+        <option value="Costume Drama">Costume Drama</option>
+        <option value="Cozy Mystery">Cozy Mystery</option>
+        <option value="Crime Documentary">Crime Documentary</option>
+        <option value="Crime Reality TV">Crime Reality TV</option>
+        <option value="Cyber Thriller">Cyber Thriller</option>
+        <option value="Cyberpunk">Cyberpunk</option>
+        <option value="Dark Comedy">Dark Comedy</option>
+        <option value="Dark Fantasy">Dark Fantasy</option>
+        <option value="Dark Romance">Dark Romance</option>
+        <option value="Dating Reality TV">Dating Reality TV</option>
+        <option value="Desert Adventure">Desert Adventure</option>
+        <option value="Dinosaur Adventure">Dinosaur Adventure</option>
+        <option value="Disaster">Disaster</option>
+        <option value="Docudrama">Docudrama</option>
+        <option value="Docuseries">Docuseries</option>
+        <option value="Docusoap Reality TV">Docusoap Reality TV</option>
+        <option value="Drug Crime">Drug Crime</option>
+        <option value="Dystopian Sci-Fi">Dystopian Sci-Fi</option>
+        <option value="Epic">Epic</option>
+        <option value="Erotic Thriller">Erotic Thriller</option>
+        <option value="Extreme Sport">Extreme Sport</option>
+        <option value="Fairy Tale">Fairy Tale</option>
+        <option value="Faith & Spirituality Documentary">Faith & Spirituality Documentary</option>
+        <option value="Fantasy Epic">Fantasy Epic</option>
+        <option value="Farce">Farce</option>
+        <option value="Feel-Good Romance">Feel-Good Romance</option>
+        <option value="Financial Drama">Financial Drama</option>
+        <option value="Folk Horror">Folk Horror</option>
+        <option value="Food Documentary">Food Documentary</option>
+        <option value="Football">Football</option>
+        <option value="Found Footage Horror">Found Footage Horror</option>
+        <option value="Gangster">Gangster</option>
+        <option value="Giallo">Giallo</option>
+        <option value="Globetrotting Adventure">Globetrotting Adventure</option>
+        <option value="Gun Fu">Gun Fu</option>
+        <option value="Hand-Drawn Animation">Hand-Drawn Animation</option>
+        <option value="Hard-boiled Detective">Hard-boiled Detective</option>
+        <option value="Heist">Heist</option>
+        <option value="Hidden Camera">Hidden Camera</option>
+        <option value="High-Concept Comedy">High-Concept Comedy</option>
+        <option value="Historical Epic">Historical Epic</option>
+        <option value="History Documentary">History Documentary</option>
+        <option value="Holiday Animation">Holiday Animation</option>
+        <option value="Holiday Comedy">Holiday Comedy</option>
+        <option value="Holiday Family">Holiday Family</option>
+        <option value="Holiday Romance">Holiday Romance</option>
+        <option value="Home Improvement">Home Improvement</option>
+        <option value="Isekai">Isekai</option>
+        <option value="Iyashikei">Iyashikei</option>
+        <option value="Jason Statham Action">Jason Statham Action</option>
+        <option value="Josei">Josei</option>
+        <option value="Jukebox Musical">Jukebox Musical</option>
+        <option value="Jungle Adventure">Jungle Adventure</option>
+        <option value="Kaiju">Kaiju</option>
+        <option value="Korean Drama">Korean Drama</option>
+        <option value="Kung Fu">Kung Fu</option>
+        <option value="Legal Drama">Legal Drama</option>
+        <option value="Legal Thriller">Legal Thriller</option>
+        <option value="Martial Arts">Martial Arts</option>
+        <option value="Mecha">Mecha</option>
+        <option value="Medical Drama">Medical Drama</option>
+        <option value="Military Documentary">Military Documentary</option>
+        <option value="Mockumentary">Mockumentary</option>
+        <option value="Monster Horror">Monster Horror</option>
+        <option value="Motorsport">Motorsport</option>
+        <option value="Mountain Adventure">Mountain Adventure</option>
+        <option value="Music Documentary">Music Documentary</option>
+        <option value="Nature Documentary">Nature Documentary</option>
+        <option value="One-Person Army">One-Person Army</option>
+        <option value="Paranormal Reality TV">Paranormal Reality TV</option>
+        <option value="Parody">Parody</option>
+        <option value="Period Drama">Period Drama</option>
+        <option value="Police Procedural">Police Procedural</option>
+        <option value="Political Documentary">Political Documentary</option>
+        <option value="Political Drama">Political Drama</option>
+        <option value="Political Thriller">Political Thriller</option>
+        <option value="Pop Musical">Pop Musical</option>
+        <option value="Prison Drama">Prison Drama</option>
+        <option value="Psychological Drama">Psychological Drama</option>
+        <option value="Psychological Horror">Psychological Horror</option>
+        <option value="Psychological Thriller">Psychological Thriller</option>
+        <option value="Quest">Quest</option>
+        <option value="Quirky Comedy">Quirky Comedy</option>
+        <option value="Quiz Show">Quiz Show</option>
+        <option value="Raunchy Comedy">Raunchy Comedy</option>
+        <option value="Road Trip">Road Trip</option>
+        <option value="Rock Musical">Rock Musical</option>
+        <option value="Romantic Comedy">Romantic Comedy</option>
+        <option value="Romantic Epic">Romantic Epic</option>
+        <option value="Samurai">Samurai</option>
+        <option value="Satire">Satire</option>
+        <option value="Science & Technology Documentary">Science & Technology Documentary</option>
+        <option value="Sci-Fi Epic">Sci-Fi Epic</option>
+        <option value="Screwball Comedy">Screwball Comedy</option>
+        <option value="Sea Adventure">Sea Adventure</option>
+        <option value="Seinen">Seinen</option>
+        <option value="Serial Killer">Serial Killer</option>
+        <option value="Shōjo">Shōjo</option>
+        <option value="Shōnen">Shōnen</option>
+        <option value="Showbiz Drama">Showbiz Drama</option>
+        <option value="Sitcom">Sitcom</option>
+        <option value="Sketch Comedy">Sketch Comedy</option>
+        <option value="Slapstick">Slapstick</option>
+        <option value="Slasher Horror">Slasher Horror</option>
+        <option value="Slice of Life">Slice of Life</option>
+        <option value="Soap Opera">Soap Opera</option>
+        <option value="Soccer">Soccer</option>
+        <option value="Space Sci-Fi">Space Sci-Fi</option>
+        <option value="Spaghetti Western">Spaghetti Western</option>
+        <option value="Splatter Horror">Splatter Horror</option>
+        <option value="Spy">Spy</option>
+        <option value="Stand-Up">Stand-Up</option>
+        <option value="Steampunk">Steampunk</option>
+        <option value="Steamy Romance">Steamy Romance</option>
+        <option value="Stoner Comedy">Stoner Comedy</option>
+        <option value="Superhero">Superhero</option>
+        <option value="Supernatural Fantasy">Supernatural Fantasy</option>
+        <option value="Supernatural Horror">Supernatural Horror</option>
+        <option value="Survival">Survival</option>
+        <option value="Survival Competition">Survival Competition</option>
+        <option value="Suspense Mystery">Suspense Mystery</option>
+        <option value="Swashbuckler">Swashbuckler</option>
+        <option value="Sword & Sandal">Sword & Sandal</option>
+        <option value="Sword & Sorcery">Sword & Sorcery</option>
+        <option value="Talent Competition">Talent Competition</option>
+        <option value="Teen Adventure">Teen Adventure</option>
+        <option value="Teen Comedy">Teen Comedy</option>
+        <option value="Teen Drama">Teen Drama</option>
+        <option value="Teen Fantasy">Teen Fantasy</option>
+        <option value="Teen Horror">Teen Horror</option>
+        <option value="Teen Romance">Teen Romance</option>
+        <option value="Telenovela">Telenovela</option>
+        <option value="Time Travel">Time Travel</option>
+        <option value="Tragedy">Tragedy</option>
+        <option value="Tragic Romance">Tragic Romance</option>
+        <option value="Travel">Travel</option>
+        <option value="Travel Documentary">Travel Documentary</option>
+        <option value="True Crime">True Crime</option>
+        <option value="Urban Adventure">Urban Adventure</option>
+        <option value="Vampire Horror">Vampire Horror</option>
+        <option value="War Epic">War Epic</option>
+        <option value="Water Sport">Water Sport</option>
+        <option value="Werewolf Horror">Werewolf Horror</option>
+        <option value="Western Epic">Western Epic</option>
+        <option value="Whodunit">Whodunit</option>
+        <option value="Witch Horror">Witch Horror</option>
+        <option value="Workplace Drama">Workplace Drama</option>
+        <option value="Wuxia">Wuxia</option>
+        <option value="Zombie Horror">Zombie Horror</option>
+      </select>
+    </label>
+    <label class="fld">ss
+      <select id="streamHomo">
+        <option value="">All</option>
+        <option value="yes">Yes</option>
+        <option value="no">No</option>
+      </select>
+    </label>
+    <div class="tool-row">
+      <select id="streamSort" aria-label="Sort">
+        <option value="az">A–Z</option>
+        <option value="za">Z–A</option>
+        <option value="imdb">IMDb</option>
+        <option value="you">Your rating</option>
+      </select>
+      <button type="button" id="streamCheck">Check selected services</button>
+    </div>
+    <input type="search" id="streamQ" placeholder="Title, year, genre, director, date" autocomplete="off">
+    <div id="streamStatus" class="sub" style="margin:6px 0"></div>
+    <div id="streamOut"></div>
+  </div>
+
+  <div id="secSettings" class="section">
+    <div class="nav" id="settingsNav">
+      <button type="button" id="setTabData" class="active">Library</button>
+      <button type="button" id="setTabLook">Appearance</button>
+    </div>
+    <div id="setData">
+    <div>
+      <label class="load">Load Collection CSV<input type="file" id="fcol" accept=".csv"></label>
+      <label class="load">Load Ratings CSV<input type="file" id="frat" accept=".csv"></label>
+      <label class="load">Load Boutique Catalog<input type="file" id="fboutique" accept=".csv"></label>
+      <button id="stripBoutiqueBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#5a3a00;color:#ffd580;border:1px solid #7a5a20;border-radius:6px;">Strip Boutique Label</button>
+      <button id="exportBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a3a2a;color:#7dcea0;border:1px solid #2a5a3a;border-radius:6px;">Export Library</button>
+      <button id="refreshImdbBtn" style="height:28px;padding:0 10px;font-size:0.75rem;background:#1a2a3a;color:#8ab4f8;border:1px solid #2a4a6a;border-radius:6px;">Refresh IMDb Ratings</button>
+    </div>
+    <div class="section-label">Friend Data</div>
+    <div style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:8px;">
+      <input type="text" id="friendName" placeholder="Friend first name" style="max-width:160px;margin:0;">
+      <label class="load">Friend Inventory<input type="file" id="friendInv" accept=".csv,.txt"></label>
+      <label class="load">Friend Ratings<input type="file" id="friendRatings" accept=".csv,.txt"></label>
+      <label class="load">Friend Watchlist<input type="file" id="friendWatchData" accept=".csv,.txt"></label>
+    </div>
+    <div id="settingsOut" style="margin-top:12px;"></div>
+    </div>
+    <div id="setLook" style="display:none">
+      <div class="section-label">SS flag</div>
+      <label style="display:flex;align-items:center;gap:8px;margin:8px 0 16px">
+        <input type="checkbox" id="ssOnCard">
+        <span>Show ss on inventory cards</span>
+      </label>
+      <div class="section-label">Disc badges</div>
+      <div class="sub" style="margin-bottom:10px">Gold for 4K. Blue chrome for Blu-ray. Silver chrome for DVD. Each one has three effects.</div>
+      <div id="badgeAppearance"></div>
+    </div>
+  </div>
+</main>
+
+<div class="modal" id="editPanel">
+  <div class="modal-box" style="text-align:left;max-height:80vh;overflow:auto">
+    <p id="editTitle" style="font-weight:600;margin:0 0 8px"></p>
+    <label style="display:block;margin:6px 0">Source<br><input type="text" id="editSource" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">EAN / Barcode<br><input type="text" id="editEan" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">IMDb ID<br><input type="text" id="editImdbId" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Disc Type<br><input type="text" id="editDiscType" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Audio Format<br><input type="text" id="editAudioFormat" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Audio Channels<br><input type="text" id="editAudioChannels" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Edition<br><input type="text" id="editEdition" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Release<br><input type="text" id="editRelease" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Languages<br><input type="text" id="editLanguages" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Subtitles<br><input type="text" id="editSubtitles" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Runtime<br><input type="text" id="editRuntime" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Genres<br><input type="text" id="editGenres" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Director<br><input type="text" id="editDirector" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Composer<br><input type="text" id="editComposer" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Cinematographer<br><input type="text" id="editCinematographer" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Cover URL<br><input type="text" id="editCoverUrl" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Notes<br><input type="text" id="editNotes" style="width:100%;height:36px"></label>
+    <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
+      <input type="checkbox" id="editSs">
+      <span>ss</span>
+    </label>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="editSave">Save</button>
+      <button id="editCancel" style="background:#333">Cancel</button>
+    </div>
+  </div>
+</div>
+
+
+
+<script>
+function closeModal(){
+  var m = document.getElementById("modal");
+  if (m) { m.className = "modal"; m.style.display = "none"; }
+  document.body.style.overflow = "";
+}
+const OMDB_KEY = "8d83ba51";
+const TMDB_KEY = "29c3cb82fa06b97815b502bb02cee215";
+const UPCMDB_KEY = "d207a24928dc0f20f056afe5cb887437";
+const UPCDATABASE_KEY = "7451A8510DEE05A60529AAE24745905D";
+const $ = id => document.getElementById(id);
+let collection = JSON.parse(localStorage.getItem("md_coll") || "[]");
+let manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
+let homoFlags = JSON.parse(localStorage.getItem("md_homo") || "{}");
+let guideFlags = JSON.parse(localStorage.getItem("md_guide") || "{}");
+let boutiqueFlags = JSON.parse(localStorage.getItem("md_boutique") || "{}");
+const BOUTIQUE_LABELS = ["Arrow","Manta Labs","Kino Lorber","Criterion","Vinegar Syndrome","Severin","Scream Factory","Shout Factory","88 Films","Eureka","Indicator"];
+function stripBoutique(label) {
+  if (!label) return;
+  const l = label.toLowerCase();
+  const ids = Object.keys(boutiqueFlags).filter(id => (boutiqueFlags[id] || "").toLowerCase() === l);
+  if (!ids.length) { showPopup("No titles marked " + label); return; }
+  if (!confirm("Remove " + ids.length + " title(s) marked " + label + "?")) return;
+  manualTitles = manualTitles.filter(m => !ids.includes(m.id));
+  ids.forEach(id => delete boutiqueFlags[id]);
+  saveManual();
+  saveBoutique();
+  render();
+  showPopup("Stripped " + ids.length + " " + label + " title(s)");
+}
+let ratingsById = {};
+let myRatings = {};
+let myRatingsById = {};
+let dbPromise = null;
+function openDb() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open("MovieDesk", 4);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains("ratings")) db.createObjectStore("ratings");
+      if (!db.objectStoreNames.contains("boutique")) db.createObjectStore("boutique");
+      if (!db.objectStoreNames.contains("watch")) db.createObjectStore("watch");
+      if (!db.objectStoreNames.contains("stream")) db.createObjectStore("stream");
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+async function idbGetAll(store) {
+  const db = await openDb();
+  return new Promise(resolve => {
+    const tx = db.transaction(store, "readonly");
+    const req = tx.objectStore(store).getAll();
+    const keysReq = tx.objectStore(store).getAllKeys();
+    let vals, keys;
+    req.onsuccess = () => { vals = req.result; if (keys) finish(); };
+    keysReq.onsuccess = () => { keys = keysReq.result; if (vals) finish(); };
+    function finish() {
+      const map = {};
+      keys.forEach((k, i) => map[k] = vals[i]);
+      resolve(map);
+    }
+  });
+}
+async function idbPutMap(store, map) {
+  const db = await openDb();
+  return new Promise(resolve => {
+    const tx = db.transaction(store, "readwrite");
+    const os = tx.objectStore(store);
+    os.clear();
+    Object.keys(map).forEach(k => os.put(map[k], k));
+    tx.oncomplete = () => resolve();
+  });
+}
+async function idbClear(store) {
+  const db = await openDb();
+  return new Promise(resolve => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).clear();
+    tx.oncomplete = () => resolve();
+  });
+}
+async function loadRatingsFromDb() {
+  try {
+    const raw = await idbGetAll("ratings");
+    myRatings = {};
+    myRatingsById = {};
+    if (raw && raw.__v2 && raw.__v2.byId) {
+      myRatingsById = raw.__v2.byId || {};
+      myRatings = raw.__v2.byTitle || {};
+    }
+    Object.keys(raw || {}).forEach(k => {
+      if (k === "__v2" || k === "__meta") return;
+      const v = raw[k];
+      if (v && typeof v === "object" && v.imdbId) {
+        myRatingsById[v.imdbId] = v;
+        const key = norm(v.title || "");
+        if (!key) return;
+        if (!myRatings[key]) myRatings[key] = [];
+        if (!myRatings[key].some(r => r.imdbId === v.imdbId)) myRatings[key].push(v);
+      } else if (typeof v === "string" && v) {
+        myRatings[k] = [{ rating: v, date: "", imdbId: "", title: "", year: "", type: "" }];
+      }
+    });
+    if (typeof stampStoredGenres === "function") stampStoredGenres();
+    if (typeof render === "function") render();
+    if (typeof currentSection !== "undefined" && currentSection === "settings" && typeof showSettings === "function") showSettings();
+  } catch(e) {}
+}
+function ratingList(title) {
+  const v = myRatings[norm(title || "")];
+  if (!v) return [];
+  if (typeof v === "string") return [{ rating: v, date: "", imdbId: "", year: "", type: "", title: title || "" }];
+  if (Array.isArray(v)) return v;
+  if (v && v.rating) return [v];
+  return [];
+}
+function movieYear(obj) {
+  if (!obj) return "";
+  const src = obj.year || obj.release || "";
+  if (obj._ysrc === src) return obj._y || "";
+  obj._ysrc = src;
+  const m = String(src).match(/(19|20)\d{2}/);
+  obj._y = m ? m[0] : "";
+  return obj._y;
+}
+function ratingRecFor(m) {
+  if (!m) return null;
+  const id = String(m.imdbId || "").trim();
+  const y = movieYear(m);
+  if (id) {
+    const rec = myRatingsById[id];
+    if (!rec) return null;
+    const ry = movieYear(rec);
+    if (y && ry && y !== ry) return null;
+    return rec;
+  }
+  const list = ratingList(m.title);
+  if (!list.length) return null;
+  if (y) {
+    const hits = list.filter(r => movieYear(r) === y);
+    return hits.length ? hits[0] : null;
+  }
+  const years = [...new Set(list.map(movieYear).filter(Boolean))];
+  if (years.length > 1) return null;
+  return list[0];
+}
+function formatRatingDate(s) {
+  const m = String(s || "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return "";
+  return String(parseInt(m[2], 10)) + "/" + String(parseInt(m[3], 10)) + "/" + m[1];
+}
+function ratingBadge(m) {
+  const r = ratingRecFor(m);
+  if (!r || !r.rating) return "";
+  const date = formatRatingDate(r.date);
+  return '<span class="flag" style="background:#1a2a3a;color:#8ab4f8">You: ' + r.rating + (date ? " · " + date : "") + '</span>';
+}
+const RATING_SKIP = { "tv episode": 1, "video game": 1, "podcast series": 1, "podcast episode": 1, "music video": 1 };
+function indexRatingsCsv(text) {
+  const lines = String(text || "").split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { kept: 0, skipped: 0, empty: true };
+  const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+  const col = name => header.findIndex(h => h === name);
+  const titleIdx = col("title");
+  const ratingIdx = col("your rating");
+  const dateIdx = col("date rated");
+  const idIdx = header.findIndex(h => h === "const" || h === "imdb id" || h === "tconst");
+  const yearIdx = col("year");
+  const typeIdx = col("title type");
+  const genreIdx = header.findIndex(h => h === "genres" || h === "genre");
+  const dirIdx = header.findIndex(h => h === "directors" || h === "director");
+  const runIdx = header.findIndex(h => h === "runtime (mins)" || h === "runtime");
+  const relIdx = header.findIndex(h => h === "release date" || h === "released");
+  const byId = {};
+  const byTitle = {};
+  let kept = 0, skipped = 0;
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    const type = typeIdx >= 0 ? (cols[typeIdx] || "").trim() : "";
+    if (type && RATING_SKIP[type.toLowerCase()]) { skipped++; continue; }
+    const title = (cols[titleIdx >= 0 ? titleIdx : 3] || "").trim();
+    const rating = (cols[ratingIdx >= 0 ? ratingIdx : 1] || "").trim();
+    if (!title || !rating) continue;
+    const imdbId = idIdx >= 0 ? (cols[idIdx] || "").trim() : "";
+    const rec = {
+      rating: rating,
+      date: dateIdx >= 0 ? (cols[dateIdx] || "").trim() : "",
+      imdbId: imdbId,
+      title: title,
+      year: yearIdx >= 0 ? (cols[yearIdx] || "").trim() : "",
+      type: type,
+      genres: genreIdx >= 0 ? (cols[genreIdx] || "").trim() : "",
+      director: dirIdx >= 0 ? (cols[dirIdx] || "").trim() : "",
+      runtime: runIdx >= 0 ? (cols[runIdx] || "").trim() : "",
+      released: relIdx >= 0 ? (cols[relIdx] || "").trim() : ""
+    };
+    const key = norm(title);
+    if (!byTitle[key]) byTitle[key] = [];
+    byTitle[key].push(rec);
+    if (imdbId) byId[imdbId] = rec;
+    kept++;
+  }
+  myRatings = byTitle;
+  myRatingsById = byId;
+  return { kept: kept, skipped: skipped };
+}
+function stampStoredGenres() {
+  let n = 0;
+  const take = m => {
+    if (!m || m.genres) return;
+    let g = "";
+    if (m.imdbId && myRatingsById[m.imdbId] && myRatingsById[m.imdbId].genres) g = myRatingsById[m.imdbId].genres;
+    if (!g) {
+      const list = myRatings[norm(m.title)] || [];
+      const y = movieYear(m);
+      const hit = list.find(r => r && r.genres && (!y || String(r.year || "") === y)) || list.find(r => r && r.genres);
+      if (hit) g = hit.genres;
+    }
+    if (!g) {
+      const w = (myWatchlist || []).find(x => x && x.genres && ((m.imdbId && x.imdbId === m.imdbId) || norm(x.title) === norm(m.title)));
+      if (w) g = w.genres;
+    }
+    if (g) { m.genres = g; delete m._blob; n++; }
+  };
+  getAll().forEach(take);
+  if (n) { saveColl(); saveManual(); }
+  return n;
+}
+function stampRatingIds() {
+  let n = 0;
+  getAll().forEach(m => {
+    if (!m || m.imdbId) return;
+    const list = ratingList(m.title);
+    const y = String(m.year || m.release || "").match(/(19|20)\d{2}/);
+    const exact = y ? list.filter(r => String(r.year || "") === y[0] && r.imdbId) : list.filter(r => r.imdbId);
+    if (exact.length !== 1) return;
+    m.imdbId = exact[0].imdbId;
+    n++;
+  });
+  if (n) { saveColl(); saveManual(); }
+  return n;
+}
+async function saveRatings() {
+  const db = await openDb();
+  const ids = Object.keys(myRatingsById);
+  await new Promise((resolve, reject) => {
+    const tx = db.transaction("ratings", "readwrite");
+    const os = tx.objectStore("ratings");
+    os.clear();
+    ids.forEach(id => os.put(myRatingsById[id], id));
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error || new Error("Could not save ratings"));
+    tx.onabort = () => reject(tx.error || new Error("Could not save ratings"));
+  });
+  localStorage.removeItem("md_my_ratings");
+}
+function parseCsvLine(line) {
+  const out = [];
+  let cur = "", inQ = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') { if (inQ && line[i+1] === '"') { cur += '"'; i++; } else inQ = !inQ; }
+    else if (c === "," && !inQ) { out.push(cur); cur = ""; }
+    else cur += c;
+  }
+  out.push(cur);
+  return out;
+}
+function loadMyRatings() {
+  const el = $("frat");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      try {
+        const result = indexRatingsCsv(reader.result || "");
+        if (result.empty) { showPopup("Empty file."); return; }
+        const stamped = stampRatingIds();
+        await saveRatings();
+        const tagged = stampStoredGenres();
+        showPopup("Ratings kept: " + result.kept + ". Stored " + Object.keys(myRatingsById).length + ". Skipped " + result.skipped + " episodes, games, and podcasts." + (stamped ? " IMDb id stamped on " + stamped + " discs." : "") + (tagged ? " Genre tags copied to " + tagged + " discs." : ""));
+        render();
+        if (currentSection === "settings") showSettings();
+      } catch (err) {
+        showPopup("Ratings did not save: " + (err && err.message ? err.message : err));
+      }
+    };
+    reader.readAsText(file);
+  };
+}
+loadMyRatings();
+loadRatingsFromDb();
+let boutiqueCatalog = {};
+async function loadBoutiqueCatalog() {
+  try {
+    boutiqueCatalog = await idbGetAll("boutique");
+  } catch(e) {}
+}
+loadBoutiqueCatalog();
+function lookupBoutique(barcode) {
+  if (!barcode) return null;
+  const clean = String(barcode).replace(/\D/g, "");
+  if (!clean) return null;
+  const tries = [clean, barcode];
+  if (clean.length === 13 && clean.startsWith("0")) tries.push(clean.slice(1));
+  if (clean.length === 12) tries.push("0" + clean);
+  if (clean.length === 13) tries.push(clean.slice(1));
+  if (clean.length === 12) tries.push(clean.slice(0, 12));
+  for (const t of tries) {
+    if (boutiqueCatalog[t]) return boutiqueCatalog[t];
+  }
+  return null;
+}
+function loadBoutiqueCsv() {
+  const el = $("fboutique");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const lines = (reader.result || "").split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) { showPopup("Empty file."); return; }
+      const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      const idx = name => header.findIndex(h => h === name || h.replace(/[^a-z]/g, "") === name.replace(/[^a-z]/g, ""));
+      const bIdx = ["barcode","upc","ean","gtin"].map(idx).find(i => i >= 0);
+      const tIdx = idx("title");
+      const eIdx = ["edition","format"].map(idx).find(i => i >= 0);
+      const lIdx = ["label","boutique","studio"].map(idx).find(i => i >= 0);
+      const cIdx = ["coverurl","cover","cover_url","image","source_url","sourceurl"].map(idx).find(i => i >= 0);
+      if (bIdx == null || bIdx < 0) { showPopup("Need a barcode / upc / ean column."); return; }
+      const map = {};
+      let coverCount = 0;
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const bc = (cols[bIdx] || "").replace(/\D/g, "");
+        if (!bc) continue;
+        const title = (tIdx >= 0 ? cols[tIdx] : "") || "";
+        const edition = (eIdx >= 0 ? cols[eIdx] : "") || "";
+        const label = (lIdx >= 0 ? cols[lIdx] : "") || "";
+        const cover = (cIdx >= 0 ? cols[cIdx] : "") || "";
+        if (!map[bc]) map[bc] = { title: title, edition: edition, label: label, coverUrl: cover, covers: [] };
+        const rec = map[bc];
+        if (!rec.title && title) rec.title = title;
+        if (!rec.label && label) rec.label = label;
+        if (!rec.edition && edition) rec.edition = edition;
+        if (cover && !rec.covers.some(c => c.url === cover)) {
+          rec.covers.push({ url: cover, label: label || "Boutique", edition: edition || "" });
+          coverCount++;
+        }
+        if (!rec.coverUrl && cover) rec.coverUrl = cover;
+      }
+      boutiqueCatalog = map;
+      await idbPutMap("boutique", boutiqueCatalog);
+      showPopup("Boutique catalog: " + Object.keys(map).length + " barcodes, " + coverCount + " covers");
+    };
+    reader.readAsText(file);
+  };
+}
+loadBoutiqueCsv();
+let scanning = false;
+let stream = null;
+let scanTarget = null; // "mother" or "child"
+
+let idMap = null;
+let invIndex = null;
+function bustLookups() { idMap = null; invIndex = null; }
+function saveColl(){ bustLookups(); localStorage.setItem("md_coll", JSON.stringify(collection)); }
+function saveManual(){ bustLookups(); localStorage.setItem("md_manual", JSON.stringify(manualTitles)); }
+function saveHomo(){ localStorage.setItem("md_homo", JSON.stringify(homoFlags)); }
+function saveGuide(){ localStorage.setItem("md_guide", JSON.stringify(guideFlags)); }
+function saveBoutique(){ localStorage.setItem("md_boutique", JSON.stringify(boutiqueFlags)); }
+function norm(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+let lastAddedId = "";
+function showLastId(id, title){
+  lastAddedId = id || "";
+  const txt = $("lastIdText");
+  if (txt) txt.textContent = id ? ("Last ID: " + id + (title ? " | " + title : "")) : "Last ID: -";
+  const btn = $("lastIdCopy");
+  if (btn) btn.dataset.copy = id || "";
+}
+$("stripBoutiqueBtn").onclick = () => {
+  const label = prompt("Strip all titles marked with which boutique label?\n" + BOUTIQUE_LABELS.join(", "));
+  if (label) stripBoutique(label.trim());
+};
+$("exportBtn").onclick = () => {
+  const rows = [["title","barcode","type","motherId","boutique","homosexualScenes","parentsGuide","imdbRating","friendRating"]];
+  const name = ($("friendName") && $("friendName").value.trim()) || "";
+  getAll().forEach(m => {
+    const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
+    const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
+    const homo = homoFlags[key] ? "yes" : "no";
+    const guide = guideFlags[key] ? "yes" : "no";
+    const fr = friendRatings[norm(m.title)] || "";
+    rows.push([
+      m.title || "",
+      m.barcode || "",
+      m.isMother ? "mother" : "child",
+      m.motherId || "",
+      bout,
+      homo,
+      guide,
+      m.publicRating || "",
+      fr
+    ]);
+  });
+  const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(",")).join("\n");
+  const blob = new Blob([csv], { type: "text/csv" });
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = "MovieDesk-export.csv";
+  a.click();
+  showPopup("Exported " + (rows.length - 1) + " titles" + (name ? " (friend: " + name + ")" : ""));
+};
+$("lastIdCopy").onclick = () => {
+  const id = $("lastIdCopy").dataset.copy;
+  if (!id) return;
+  navigator.clipboard.writeText(id).then(() => {
+    const old = $("lastIdCopy").textContent;
+    $("lastIdCopy").textContent = "Copied";
+    setTimeout(() => $("lastIdCopy").textContent = old, 1000);
+  });
+};
+
+function showPopup(msg){
+  if (sessionStorage.getItem("md_popup_off") === "1") return;
+  if (localStorage.getItem("md_popup_off") === "1") return;
+  var b = document.getElementById("toast");
+  if (!b) {
+    b = document.createElement("div");
+    b.id = "toast";
+    b.style.cssText = "position:fixed;top:12px;left:12px;right:12px;z-index:99999;background:#1a1a1a;border:1px solid #444;border-radius:12px;padding:14px 16px;color:#eee;font-size:0.95rem;box-shadow:0 4px 20px rgba(0,0,0,.6);";
+    b.onclick = function(){ b.style.display = "none"; };
+    document.body.appendChild(b);
+  }
+  b.textContent = msg + "  (tap to dismiss)";
+  b.style.display = "block";
+  clearTimeout(window._toastTimer);
+  window._toastTimer = setTimeout(function(){ b.style.display = "none"; }, 4000);
+}
+window.closeModal = function() {
+  const modal = document.getElementById("modal");
+  const dis = document.getElementById("modalDisable");
+  const ses = document.getElementById("modalSession");
+  if (dis && dis.checked) localStorage.setItem("md_popup_off","1");
+  if (ses && ses.checked) sessionStorage.setItem("md_popup_off","1");
+  if (modal) {
+    modal.classList.remove("show");
+    modal.style.cssText = "display:none !important;";
+  }
+  document.body.style.overflow = "";
+  if (dis) dis.checked = false;
+  if (ses) ses.checked = false;
+};
+function bindModalClose() {
+  const ok = document.getElementById("modalOk");
+  const modal = document.getElementById("modal");
+  if (ok) ok.onclick = function(e) { e.preventDefault(); e.stopPropagation(); closeModal(); };
+  if (modal) modal.onclick = function(e) { if (e.target === modal) closeModal(); };
+}
+bindModalClose();
+setTimeout(bindModalClose, 200);
+
+function getAll(){ return collection.concat(manualTitles); }
+function getById(id){
+  if (!id) return null;
+  if (!idMap) {
+    idMap = new Map();
+    const all = getAll();
+    for (let i = 0; i < all.length; i++) if (all[i] && all[i].id) idMap.set(all[i].id, all[i]);
+  }
+  return idMap.get(id) || null;
+}
+function searchBlob(m) {
+  if (!m) return "";
+  if (m._blob == null) m._blob = norm([m.title, m.year, m.release, m.genres, m.director, m.barcode, m.imdbId, m.edition, m.discType].join(" "));
+  return m._blob;
+}
+
+// Assign IDs to any entries that are missing them
+function fixMissingIds(){
+  let changed = false;
+  [...collection, ...manualTitles].forEach(m => {
+    if (!m.id) { m.id = makeId(); changed = true; }
+  });
+  if (changed) { saveColl(); saveManual(); }
+}
+fixMissingIds();
+
+function stampAdded() {
+  let n = 1;
+  let changed = false;
+  collection.forEach(m => {
+    if (!m.addedAt) { m.addedAt = n++; changed = true; }
+  });
+  for (let i = manualTitles.length - 1; i >= 0; i--) {
+    if (!manualTitles[i].addedAt) { manualTitles[i].addedAt = n++; changed = true; }
+  }
+  if (changed) { saveColl(); saveManual(); }
+}
+stampAdded();
+
+function formatAdded(v) {
+  const n = Number(v);
+  if (!(n > 1e11)) return "";
+  const d = new Date(n);
+  if (isNaN(d.getTime())) return "";
+  try {
+    return d.toLocaleString(undefined, { month: "short", day: "numeric", year: "numeric", hour: "numeric", minute: "2-digit" });
+  } catch (e) {
+    return "";
+  }
+}
+
+function makeId(){
+  return "id-" + Math.random().toString(36).slice(2, 10);
+}
+
+function detectDiscType(raw) {
+  if (!raw) return "";
+  const s = String(raw);
+  if (/ultra\s*hd|\buhd\b|\b4k\s*ultra\b|\b4k\b/i.test(s)) return "Ultra HD";
+  if (/blu[- ]?ray|\bblu\b|\bbd\b/i.test(s)) return "Blu-ray";
+  if (/\bdvd\b/i.test(s)) return "DVD";
+  return "";
+}
+
+function makeMother(title, extra={}){
+  return {
+    id: makeId(),
+    title,
+    barcode: extra.barcode || "",
+    isMother: true,
+    diskCount: extra.diskCount || 1,
+    children: extra.children || [],
+    motherId: null,
+    fromPackage: null,
+    imdbId: extra.imdbId || "",
+    publicRating: extra.publicRating || "",
+    edition: extra.edition || "",
+    notes: extra.notes || "",
+    boutiqueLabel: extra.boutiqueLabel || "",
+    coverUrl: extra.coverUrl || "",
+    source: extra.source || "",
+    ean: extra.ean || extra.barcode || "",
+    discType: extra.discType || detectDiscType(extra.rawTitle || title),
+    audioFormat: extra.audioFormat || "",
+    audioChannels: extra.audioChannels || "",
+    release: extra.release || extra.year || "",
+    languages: extra.languages || "",
+    subtitles: extra.subtitles || "",
+    runtime: extra.runtime || "",
+    genres: extra.genres || "",
+    director: extra.director || "",
+    composer: extra.composer || "",
+    cinematographer: extra.cinematographer || "",
+    addedAt: extra.addedAt || Date.now()
+  };
+}
+function makeChild(title, motherId, extra={}){
+  return {
+    id: makeId(),
+    title,
+    barcode: extra.barcode || "",
+    isMother: false,
+    motherId,
+    fromPackage: motherId,
+    imdbId: extra.imdbId || "",
+    publicRating: extra.publicRating || "",
+    edition: extra.edition || "",
+    notes: extra.notes || "",
+    boutiqueLabel: extra.boutiqueLabel || "",
+    coverUrl: extra.coverUrl || "",
+    source: extra.source || "",
+    ean: extra.ean || extra.barcode || "",
+    discType: extra.discType || detectDiscType(extra.rawTitle || title),
+    audioFormat: extra.audioFormat || "",
+    audioChannels: extra.audioChannels || "",
+    release: extra.release || extra.year || "",
+    languages: extra.languages || "",
+    subtitles: extra.subtitles || "",
+    runtime: extra.runtime || "",
+    genres: extra.genres || "",
+    director: extra.director || "",
+    composer: extra.composer || "",
+    cinematographer: extra.cinematographer || "",
+    addedAt: extra.addedAt || Date.now()
+  };
+}
+
+function cleanTitle(raw) {
+  if (!raw) return "";
+  let t = raw;
+  // Strip common studio prefixes (Warner Brothers, Universal, etc.)
+  t = t.replace(/^(Warner\s+Brothers|Warner\s+Bros\.?|Universal|Paramount|Sony|Columbia|Disney|MGM|20th\s+Century(\s+Fox)?|Lionsgate|Lions\s*Gate|New\s+Line|DreamWorks|Fox|Miramax|Orion|Touchstone|Hollywood\s+Pictures)\s+/i, "");
+  // Strip common physical media suffixes and studio noise
+  t = t.replace(/\s*[\(\[]?\s*(Blu[- ]?ray|BluRay|BD|DVD|4K|UHD|Ultra\s*HD|Digital|Combo|Disc|Edition|Special|Collector|Steelbook|Slipcover).*[\)\]]?/gi, "");
+  t = t.replace(/\s*[---]\s*(Blu[- ]?ray|DVD|4K).*$/gi, "");
+  t = t.replace(/\s*\d+\s*Disc(s)?\b/gi, "");
+  t = t.replace(/\s*\([^)]*\)\s*$/g, ""); // trailing paren groups
+  t = t.replace(/\s+/g, " ").trim();
+  return t || raw;
+}
+
+async function trySource(name, url, parse) {
+  try {
+    const res = await fetch(url);
+    if (!res.ok) return { name, ok: false, title: null, data: null };
+    const data = await res.json();
+    const title = parse(data);
+    return { name, ok: !!title, title: title || null, data };
+  } catch (e) {
+    return { name, ok: false, title: null, data: null };
+  }
+}
+
+async function refineWithOMDB(rawTitle) {
+  const cleaned = cleanTitle(rawTitle);
+  if (!cleaned || cleaned.length < 3) return { title: rawTitle, imdbId: "", rating: "", refined: false, discType: detectDiscType(rawTitle) };
+  try {
+    const res = await fetch(`https://www.omdbapi.com/?t=${encodeURIComponent(cleaned)}&apikey=${OMDB_KEY}`);
+    const d = await res.json();
+    if (d && d.Response === "True" && d.Title) {
+      return {
+        title: d.Title,
+        imdbId: d.imdbID || "",
+        rating: d.imdbRating || "",
+        year: d.Year || "",
+        release: d.Released || d.Year || "",
+        runtime: d.Runtime || "",
+        genres: d.Genre || "",
+        director: d.Director || "",
+        languages: d.Language || "",
+        source: "OMDB",
+        discType: detectDiscType(rawTitle),
+        refined: true
+      };
+    }
+  } catch (e) {}
+  return { title: cleaned || rawTitle, imdbId: "", rating: "", refined: false, discType: detectDiscType(rawTitle) };
+}
+
+let refreshBusy = false;
+async function omdbById(id) {
+  const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(id) + "&apikey=" + OMDB_KEY);
+  return await res.json();
+}
+async function refreshPublicRatings() {
+  if (refreshBusy) return;
+  refreshBusy = true;
+  const btn = $("refreshImdbBtn");
+  if (btn) btn.disabled = true;
+  const out = $("settingsOut");
+  try {
+    const groups = {};
+    let noId = 0;
+    getAll().forEach(m => {
+      const id = String(m.imdbId || "").trim();
+      if (!/^tt\d+$/.test(id)) { noId++; return; }
+      if (!groups[id]) groups[id] = [];
+      groups[id].push(m);
+    });
+    const ids = Object.keys(groups);
+    if (!ids.length) {
+      showPopup("No IMDb ids on your discs. Add from the title list, or load your ratings CSV, then try again.");
+      return;
+    }
+    const scores = {};
+    let failed = 0;
+    let stopped = "";
+    const queue = ids.slice();
+    let done = 0;
+    async function worker() {
+      while (queue.length && !stopped) {
+        const id = queue.shift();
+        try {
+          const d = await omdbById(id);
+          done++;
+          if (out) out.textContent = "Refreshing public IMDb ratings " + done + " / " + ids.length;
+          if (d && d.Response === "False") {
+            if (/limit/i.test(d.Error || "")) { stopped = "limit"; return; }
+            failed++;
+            continue;
+          }
+          const rating = d && d.imdbRating && d.imdbRating !== "N/A" ? String(d.imdbRating) : "";
+          if (!rating) failed++;
+          else scores[id] = rating;
+        } catch (e) {
+          done++;
+          failed++;
+        }
+      }
+    }
+    await Promise.all([worker(), worker(), worker(), worker()]);
+    let changed = 0, same = 0;
+    Object.keys(scores).forEach(id => {
+      groups[id].forEach(m => {
+        if (String(m.publicRating || "") === scores[id]) same++;
+        else { m.publicRating = scores[id]; changed++; }
+      });
+    });
+    if (changed) { saveColl(); saveManual(); }
+    let watchChanged = 0;
+    myWatchlist.forEach(w => {
+      if (!w || !w.imdbId || !scores[w.imdbId]) return;
+      if (String(w.imdbRating || "") === scores[w.imdbId]) return;
+      w.imdbRating = scores[w.imdbId];
+      watchChanged++;
+    });
+    if (watchChanged) await saveWatch();
+    if (currentSection === "inventory") render();
+    if (currentSection === "watch") renderWatch();
+    const left = stopped === "limit" ? " Daily lookup limit hit. Tap again tomorrow for the rest." : "";
+    const none = noId ? " " + noId + " discs have no IMDb id, so they were skipped." : "";
+    showPopup("Public IMDb ratings refreshed. Updated " + changed + ". Already current " + same + ". No score " + failed + "." + none + left);
+    if (out) out.textContent = "";
+  } finally {
+    refreshBusy = false;
+    if (btn) btn.disabled = false;
+  }
+}
+$("refreshImdbBtn").onclick = () => { refreshPublicRatings(); };
+
+async function lookupBarcode(code) {
+  const clean = (code || "").replace(/\D/g, "");
+  if (!clean) return null;
+  const candidates = [clean];
+  if (clean.length === 13 && clean.startsWith("0")) candidates.push(clean.slice(1));
+  if (clean.length === 12) candidates.push("0" + clean);
+
+  const results = [];
+  const matches = []; // {title, source}
+
+  // Always try all sources on the primary barcode
+  const c = candidates[0];
+
+  // 1st: UPCMDB (movie-specific, 500/month)
+  try {
+    const res = await fetch(`https://us-central1-upcmdb-cbae5.cloudfunctions.net/api/v1/lookup/${encodeURIComponent(c)}`, {
+      headers: { "x-api-key": UPCMDB_KEY }
+    });
+    if (res.ok) {
+      const d = await res.json();
+      const title = d.title || (d.data && d.data.title);
+      results.push({ name: "UPCMDB", ok: !!title, title: title || null, data: d });
+      if (title) {
+        matches.push({ title, source: "UPCMDB", imdbId: d.imdbID || (d.data && d.data.imdbID) || "" });
+        // good hit - skip the rest
+      }
+    } else {
+      results.push({ name: "UPCMDB", ok: false, title: null, data: null });
+    }
+  } catch (e) {
+    results.push({ name: "UPCMDB", ok: false, title: null, data: null });
+  }
+
+  // Only fall through if UPCMDB missed
+  if (!matches.length) {
+  // 2nd: UPCDatabase.org
+  if (UPCDATABASE_KEY) {
+    const upcdb = await trySource("UPCDatabase",
+      `https://proxy.cors.dev/https://api.upcdatabase.org/product/${encodeURIComponent(c)}?apikey=${UPCDATABASE_KEY}`,
+      d => (d.success && (d.title || d.itemname)) || null);
+    results.push(upcdb);
+    if (upcdb.title) matches.push({ title: upcdb.title, source: "UPCDatabase" });
+  }
+
+  // 3rd: GTINHub via CORS proxy
+  const gtin = await trySource("GTINHub",
+    `https://proxy.cors.dev/https://gtinhub.com/api/v1/product/${encodeURIComponent(c)}`,
+    d => d.found && d.product && (d.product.name || d.product.title) || null);
+  results.push(gtin);
+  if (gtin.title) matches.push({ title: gtin.title, source: "GTINHub" });
+
+  // 4th: UPCitemdb via proxy
+  const upc = await trySource("UPCitemdb-proxy",
+    `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(c)}`,
+    d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
+  results.push(upc);
+  if (upc.title) matches.push({ title: upc.title, source: "UPCitemdb-proxy" });
+
+  // UPCDatabase moved to 2nd
+  if (!matches.length && candidates.length > 1) {
+    for (const alt of candidates.slice(1)) {
+      const altUpc = await trySource("UPCitemdb-proxy-alt",
+        `https://barcode-proxy.frankiymydear.workers.dev/?upc=${encodeURIComponent(alt)}`,
+        d => (d.items && d.items[0] && (d.items[0].title || d.items[0].description)) || null);
+      results.push(altUpc);
+      if (altUpc.title) {
+        matches.push({ title: altUpc.title, source: "UPCitemdb-proxy" });
+        break;
+      }
+    }
+  }
+  } // end UPCMDB fallback
+
+  const status = $("barcodeStatus");
+  if (status) {
+    status.style.display = "block";
+    const lines = results.map(r => (r.ok ? "OK" : "FAIL") + " - " + r.name).join("<br>");
+    status.innerHTML = "<b>Barcode lookup:</b><br>" + lines +
+      (matches.length ? "<br><b>Matches found:</b> " + matches.length : "");
+  }
+
+  return {
+    matches,
+    results,
+    barcode: clean
+  };
+}
+
+function stopScan() {
+  scanning = false;
+  if (stream) stream.getTracks().forEach(t => t.stop());
+  stream = null;
+  $("scanner").style.display = "none";
+  $("video").srcObject = null;
+  scanTarget = null;
+}
+
+async function ensureBarcodeDetector() {
+  if (window.BarcodeDetector) return true;
+  return new Promise(resolve => {
+    const s = document.createElement("script");
+    s.src = "https://cdn.jsdelivr.net/npm/barcode-detector@3/dist/iife/polyfill.min.js";
+    s.onload = () => resolve(!!window.BarcodeDetector);
+    s.onerror = () => resolve(false);
+    document.head.appendChild(s);
+  });
+}
+
+async function startScan(target) {
+  if (scanning) { stopScan(); return; }
+  const status = $("barcodeStatus");
+  status.style.display = "block";
+  status.innerHTML = "Starting camera...";
+  if (!window.BarcodeDetector) {
+    status.innerHTML = "Loading iPhone scanner...";
+    const ok = await ensureBarcodeDetector();
+    if (!ok) { showPopup("Barcode scanning not available in this browser."); return; }
+  }
+  scanTarget = target;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+    const video = $("video");
+    video.srcObject = stream;
+    $("scanner").style.display = "block";
+    await video.play();
+    scanning = true;
+    const detector = new BarcodeDetector({ formats: ["ean_13","ean_8","upc_a","upc_e","code_128"] });
+
+    // Wait until the video has frames
+    status.innerHTML = "Focusing - hold steady...";
+    let readyTries = 0;
+    while (video.readyState < 2 && readyTries < 30 && scanning) {
+      await new Promise(r => setTimeout(r, 100));
+      readyTries++;
+    }
+    if (!scanning) return;
+    status.innerHTML = "Ready - hold the barcode in frame (auto)";
+
+    // Canvas path: more reliable on iPhone Safari than detect(video)
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d", { willReadFrequently: true });
+
+    let stable = null;
+    let stableCount = 0;
+    const loop = async () => {
+      if (!scanning) return;
+      try {
+        if (video.videoWidth && video.videoHeight) {
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        }
+        const codes = await detector.detect(canvas);
+        if (codes.length) {
+          const raw = codes[0].rawValue;
+          if (raw === stable) stableCount++;
+          else { stable = raw; stableCount = 1; }
+          status.innerHTML = "Saw: " + raw + " (" + stableCount + "/8) - hold steady";
+          if (stableCount >= 8) {
+            const rawFinal = raw;
+            status.innerHTML = "Locked - " + rawFinal + "...";
+            // short deliberate pause so the lock is visible
+            await new Promise(r => setTimeout(r, 600));
+            if (!scanning) return;
+            stopScan();
+            status.innerHTML = "Looking up " + rawFinal + "...";
+            const result = await lookupBarcode(rawFinal);
+            const field = target === "mother" ? $("motherTitle") : $("childTitle");
+            const box = target === "mother" ? $("motherSuggest") : $("childSuggest");
+            field.dataset.barcode = result ? result.barcode : rawFinal;
+            const hits = (result && result.matches) || [];
+            field.dataset.rawTitle = (hits[0] && hits[0].title) || rawFinal;
+            field.dataset.discType = detectDiscType(field.dataset.rawTitle);
+            if (hits.length) {
+              box.innerHTML = hits.map(m => {
+                const safe = (m.title || "").replace(/"/g, "&quot;");
+                return `<div data-title="${safe}" data-source="${m.source}">${m.title} <span style="color:#888;font-size:0.75rem">(${m.source})</span></div>`;
+              }).join("");
+              box.classList.add("show");
+              box.querySelectorAll("div").forEach(el => {
+                el.onclick = () => {
+                  field.value = el.dataset.title;
+                  field.dataset.imdbId = "";
+                  field.dataset.publicRating = "";
+                  box.classList.remove("show");
+                  showPopup("Selected: " + el.dataset.title);
+                };
+              });
+              field.value = hits[0].title;
+              showPopup(hits.length + " match" + (hits.length>1?"es":"") + " - pick one from the list.");
+            } else {
+              field.value = rawFinal;
+              box.classList.remove("show");
+              showPopup("Scanned " + rawFinal + " - no title match.");
+            }
+            return;
+          }
+        } else {
+          stable = null;
+          stableCount = 0;
+          status.innerHTML = "Looking... hold the barcode steady (auto)";
+        }
+      } catch (e) {
+        status.innerHTML = "Detect error: " + (e.message || e);
+      }
+      if (scanning) requestAnimationFrame(loop);
+    };
+    loop();
+  } catch (e) {
+    showPopup("Could not start camera: " + (e.message || e));
+    stopScan();
+  }
+}
+
+function boutiqueSuggest(query, box) {
+  const digits = (query || "").replace(/\D/g, "");
+  if (digits.length < 8) return false;
+  const hits = [];
+  const keys = Object.keys(boutiqueCatalog);
+  for (let i = 0; i < keys.length && hits.length < 33; i++) {
+    const bc = keys[i];
+    if (bc.indexOf(digits) === -1) continue;
+    const row = boutiqueCatalog[bc];
+    if (row) hits.push({ barcode: bc, title: row.title || bc, label: row.label || "", edition: row.edition || "", coverUrl: row.coverUrl || "" });
+  }
+  if (!hits.length) return false;
+  box.innerHTML = hits.map(h => `<div data-barcode="${h.barcode}" data-title="${(h.title||"").replace(/"/g,"&quot;")}" data-label="${(h.label||"").replace(/"/g,"&quot;")}" data-edition="${(h.edition||"").replace(/"/g,"&quot;")}" data-cover="${(h.coverUrl||"").replace(/"/g,"&quot;")}">${h.title}${h.label ? " | " + h.label : ""}${h.edition ? " | " + h.edition : ""}<br><span style="color:#888;font-size:0.75rem">${h.barcode}</span></div>`).join("");
+  box.classList.add("show");
+  box.querySelectorAll("div").forEach(el => {
+    el.onclick = () => {
+      const field = box.id === "motherSuggest" ? $("motherTitle") : $("childTitle");
+      field.value = el.dataset.title || el.dataset.barcode;
+      field.dataset.barcode = el.dataset.barcode || "";
+      field.dataset.boutiqueLabel = el.dataset.label || "";
+      field.dataset.edition = el.dataset.edition || "";
+      field.dataset.coverUrl = el.dataset.cover || "";
+      box.classList.remove("show");
+    };
+  });
+  return true;
+}
+async function barcodeExternalSuggest(query, box) {
+  const digits = (query || "").replace(/\D/g, "");
+  if (digits.length < 10) return false;
+  try {
+    const result = await lookupBarcode(digits);
+    if (!result || !result.matches || !result.matches.length) return false;
+    box.innerHTML = result.matches.slice(0, 20).map(m => {
+      const t = (m.title || "").replace(/"/g, "&quot;");
+      return `<div data-barcode="${digits}" data-title="${t}" data-id="${m.imdbId || ""}">${m.title}<br><span style="color:#888;font-size:0.75rem">${digits} | ${m.source || "lookup"}</span></div>`;
+    }).join("");
+    box.classList.add("show");
+    box.querySelectorAll("div").forEach(el => {
+      el.onclick = () => {
+        const field = box.id === "motherSuggest" ? $("motherTitle") : $("childTitle");
+        field.value = el.dataset.title || digits;
+        field.dataset.barcode = el.dataset.barcode || "";
+        field.dataset.imdbId = el.dataset.id || "";
+        box.classList.remove("show");
+      };
+    });
+    return true;
+  } catch (e) {
+    return false;
+  }
+}
+
+let suggestSeq = 0;
+let suggestCtrl = null;
+let suggestTimer = 0;
+function queueSuggest(value, box) {
+  clearTimeout(suggestTimer);
+  suggestTimer = setTimeout(() => omdbSuggest(value, box), 280);
+}
+async function omdbSuggest(query, box) {
+  if (boutiqueSuggest(query, box)) return;
+  const digits = (query || "").replace(/\D/g, "");
+  if (digits.length >= 10 && digits.length >= (query || "").length - 2) {
+    if (await barcodeExternalSuggest(query, box)) return;
+  }
+  if (!query || query.length < 3) { box.classList.remove("show"); return; }
+  const seq = ++suggestSeq;
+  if (suggestCtrl) suggestCtrl.abort();
+  suggestCtrl = typeof AbortController === "function" ? new AbortController() : null;
+  try {
+    const res = await fetch("https://www.omdbapi.com/?s=" + encodeURIComponent(query) + "&page=1&apikey=" + OMDB_KEY, suggestCtrl ? { signal: suggestCtrl.signal } : {});
+    if (seq !== suggestSeq) return;
+    const d = await res.json();
+    const all = (d && d.Search) || [];
+    if (all.length) {
+      box.innerHTML = all.slice(0, 10).map(m => `<div data-title="${m.Title}" data-id="${m.imdbID}">${m.Title} (${m.Year})</div>`).join("");
+      box.classList.add("show");
+      box.querySelectorAll("div").forEach(el => {
+        el.onclick = () => {
+          const field = box.id === "motherSuggest" ? $("motherTitle") : $("childTitle");
+          field.value = el.dataset.title;
+          field.dataset.imdbId = el.dataset.id;
+          box.classList.remove("show");
+        };
+      });
+    } else box.classList.remove("show");
+  } catch(e) {
+    if (e && e.name === "AbortError") return;
+    if (seq === suggestSeq) box.classList.remove("show");
+  }
+}
+
+
+async function tmdbPosters(m) {
+  if (!TMDB_KEY || !m) return [];
+  let kind = "movie";
+  let id = null;
+  try {
+    if (m.imdbId) {
+      const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(m.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
+      const d = await res.json();
+      if (d.movie_results && d.movie_results[0]) { id = d.movie_results[0].id; kind = "movie"; }
+      else if (d.tv_results && d.tv_results[0]) { id = d.tv_results[0].id; kind = "tv"; }
+    }
+    if (!id && m.title) {
+      const y = String(m.year || m.release || "").match(/(19|20)\d{2}/);
+      let url = "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(m.title) + "&api_key=" + TMDB_KEY;
+      if (y) url += "&year=" + y[0];
+      const res = await fetch(url);
+      const d = await res.json();
+      if (d.results && d.results[0]) { id = d.results[0].id; kind = "movie"; }
+      else {
+        const res2 = await fetch("https://api.themoviedb.org/3/search/tv?query=" + encodeURIComponent(m.title) + "&api_key=" + TMDB_KEY);
+        const d2 = await res2.json();
+        if (d2.results && d2.results[0]) { id = d2.results[0].id; kind = "tv"; }
+      }
+    }
+    if (!id) return [];
+    const res = await fetch("https://api.themoviedb.org/3/" + kind + "/" + id + "/images?api_key=" + TMDB_KEY);
+    const d = await res.json();
+    const posters = (d.posters || []).slice();
+    const rank = p => p.iso_639_1 === "en" ? 0 : (p.iso_639_1 == null || p.iso_639_1 === "") ? 1 : 2;
+    posters.sort((a, b) => {
+      const dlt = rank(a) - rank(b);
+      if (dlt) return dlt;
+      return (b.vote_average || 0) - (a.vote_average || 0);
+    });
+    return posters.filter(p => p.file_path).map(p => ({
+      url: "https://image.tmdb.org/t/p/w780" + p.file_path,
+      thumb: "https://image.tmdb.org/t/p/w185" + p.file_path,
+      label: (p.iso_639_1 == null || p.iso_639_1 === "") ? "TMDB · textless" : ("TMDB · " + p.iso_639_1)
+    }));
+  } catch (e) { return []; }
+}
+
+function boutiqueCoverList(row) {
+  if (!row) return [];
+  if (Array.isArray(row.covers) && row.covers.length) return row.covers.filter(c => c && c.url);
+  if (row.coverUrl) return [{ url: row.coverUrl, label: row.label || "Boutique", edition: row.edition || "" }];
+  return [];
+}
+
+async function gatherCovers(m) {
+  const urls = [];
+  const seen = new Set();
+  function add(url, label, source, thumb) {
+    if (!url || url === "N/A" || seen.has(url)) return;
+    seen.add(url);
+    urls.push({ url, label, source: source || "other", thumb: thumb || url });
+  }
+  const bout = lookupBoutique(m.barcode);
+  boutiqueCoverList(bout).forEach(c => {
+    const bits = ["Boutique"];
+    if (c.label && c.label !== "Boutique") bits.push(c.label);
+    if (c.edition) bits.push(c.edition);
+    add(c.url, bits.join(" · "), "boutique");
+  });
+  if (m.coverUrl) add(m.coverUrl, "Current", "other");
+  try {
+    const posters = await tmdbPosters(m);
+    posters.forEach(p => add(p.url, p.label, "tmdb", p.thumb));
+  } catch (e) {}
+  if (OMDB_KEY && m.imdbId) {
+    try {
+      const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(m.imdbId) + "&apikey=" + OMDB_KEY);
+      const d = await res.json();
+      if (d && d.Poster) add(d.Poster, "OMDB", "other");
+    } catch (e) {}
+  }
+  if (m.barcode) {
+    try {
+      const res = await fetch("https://barcode-proxy.frankiymydear.workers.dev/?upc=" + encodeURIComponent(m.barcode));
+      const d = await res.json();
+      const item = d.items && d.items[0];
+      if (item && item.images) {
+        for (const img of item.images.slice(0, 3)) add(img, "UPC", "other");
+      }
+    } catch (e) {}
+  }
+  return urls;
+}
+
+let currentPickId = null;
+let selectedCoverUrl = null;
+
+async function pickCover(id) {
+  const m = getById(id);
+  if (!m) return;
+  currentPickId = id;
+  selectedCoverUrl = null;
+  const box = document.getElementById("coverPicker");
+  if (!box) return;
+  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><div style="display:flex;gap:4px"><button type="button" id="coverCam" title="Take photo" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></button><button type="button" id="coverFile" title="From gallery" style="background:none;border:none;color:#eee;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg></button><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px;width:36px;height:36px"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6L6 18M6 6l12 12"/></svg></button></div></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + (m.title||"") + '</p><div id="coverFilters" style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px"></div><p style="margin:0 0 8px;font-size:0.7rem;color:#666">Posters from TMDB. Not endorsed by TMDB.</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button><button id="coverCropSel" type="button" disabled style="flex:1;height:40px;background:#2a2a2a;color:#eee;border:none;border-radius:8px">Crop selected</button></div></div>';
+  box.style.display = "flex";
+  const thumbs = document.getElementById("coverThumbs");
+  thumbs.innerHTML = '<span style="color:#888">Loading covers...</span>';
+  const urls = await gatherCovers(m);
+  let coverFilter = "all";
+  function renderFilters() {
+    const el = document.getElementById("coverFilters");
+    if (!el) return;
+    const nB = urls.filter(u => u.source === "boutique").length;
+    const nT = urls.filter(u => u.source === "tmdb").length;
+    const chips = [["all", "All " + urls.length], ["boutique", "Boutique " + nB], ["tmdb", "TMDB " + nT]];
+    el.innerHTML = chips.map(c => '<button type="button" data-filter="' + c[0] + '" style="height:28px;padding:0 10px;border-radius:14px;border:1px solid ' + (coverFilter === c[0] ? "#6af" : "#333") + ';background:' + (coverFilter === c[0] ? "#1a2a3a" : "#111") + ';color:#eee;font-size:0.75rem">' + c[1] + '</button>').join("");
+  }
+  function renderThumbs() {
+    renderFilters();
+    const list = urls.filter(u => coverFilter === "all" || u.source === coverFilter);
+    thumbs.innerHTML = list.map(u => {
+      const src = (u.thumb || u.url).replace(/"/g, "");
+      const full = String(u.url).replace(/"/g, "");
+      const lab = String(u.label || "").replace(/[<>]/g, "");
+      return '<div style="text-align:center;width:90px"><img loading="lazy" src="' + src + '" data-url="' + full + '" style="width:90px;height:135px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid #333;background:#111"><div style="font-size:0.7rem;color:#888;margin-top:2px;line-height:1.2">' + lab + '</div></div>';
+    }).join("") || '<span style="color:#888">No covers in this list. Add URL, camera, or file.</span>';
+    if (selectedCoverUrl) document.querySelectorAll("#coverThumbs img").forEach(im => { im.style.borderColor = im.dataset.url === selectedCoverUrl ? "#6af" : "#333"; });
+  }
+  const filters = document.getElementById("coverFilters");
+  if (filters) filters.onclick = function(e) {
+    const b = e.target.closest("button[data-filter]");
+    if (!b) return;
+    coverFilter = b.dataset.filter;
+    renderThumbs();
+  };
+  renderThumbs();
+  function selectUrl(url) {
+    selectedCoverUrl = url;
+    document.querySelectorAll("#coverThumbs img").forEach(im => im.style.borderColor = im.dataset.url === url ? "#6af" : "#333");
+    document.getElementById("coverUseSel").disabled = false;
+    document.getElementById("coverCropSel").disabled = false;
+  }
+  thumbs.onclick = function(e) {
+    const img = e.target.closest("img[data-url]");
+    if (img) selectUrl(img.dataset.url);
+  };
+  document.getElementById("coverCancel").onclick = () => { box.style.display = "none"; };
+  document.getElementById("coverAddUrl").onclick = () => {
+    const v = (document.getElementById("coverPaste").value || "").trim();
+    if (v) { urls.push({ url: v, label: "URL" }); document.getElementById("coverPaste").value = ""; renderThumbs(); selectUrl(v); }
+  };
+  document.getElementById("coverUseSel").onclick = () => {
+    if (selectedCoverUrl) { setCover(id, selectedCoverUrl); box.style.display = "none"; }
+  };
+  document.getElementById("coverCropSel").onclick = () => {
+    if (selectedCoverUrl) openCropper(selectedCoverUrl, id);
+  };
+  function handleFile(file) {
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result;
+      urls.push({ url: dataUrl, label: "Photo" });
+      renderThumbs();
+      selectUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  }
+  document.getElementById("coverCam").onclick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*"; inp.capture = "environment";
+    inp.onchange = () => handleFile(inp.files && inp.files[0]);
+    inp.click();
+  };
+  document.getElementById("coverFile").onclick = () => {
+    const inp = document.createElement("input");
+    inp.type = "file"; inp.accept = "image/*";
+    inp.onchange = () => handleFile(inp.files && inp.files[0]);
+    inp.click();
+  };
+  box.onclick = function(e) { if (e.target === box) box.style.display = "none"; };
+}
+
+function openCropper(url, id) {
+  const box = document.getElementById("coverPicker");
+  const panel = document.getElementById("coverPanel");
+  if (!panel) return;
+  panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>Crop cover</span><button type="button" id="cropCancel" style="background:none;border:none;color:#aaa;font-size:1.2rem">✕</button></div><canvas id="cropCanvas" style="width:100%;max-height:60vh;background:#111;border-radius:8px;touch-action:none"></canvas><p style="font-size:0.8rem;color:#888;margin:6px 0">Drag to select crop area</p><div style="display:flex;gap:8px"><button id="cropApply" type="button" style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use crop</button><button id="cropSkip" type="button" style="flex:1;height:40px;background:#222;color:#aaa;border:none;border-radius:8px">Use original</button></div>';
+  const canvas = document.getElementById("cropCanvas");
+  const ctx = canvas.getContext("2d");
+  const img = new Image();
+  img.crossOrigin = "anonymous";
+  img.onload = () => {
+    const maxW = panel.clientWidth - 24 || 400;
+    const scale = Math.min(1, maxW / img.width, 400 / img.height);
+    canvas.width = img.width * scale;
+    canvas.height = img.height * scale;
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+    let startX, startY, endX, endY, dragging = false;
+    function drawSel() {
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      if (dragging || (startX != null)) {
+        const x = Math.min(startX, endX), y = Math.min(startY, endY);
+        const w = Math.abs(endX - startX), h = Math.abs(endY - startY);
+        ctx.strokeStyle = "#6af"; ctx.lineWidth = 2;
+        ctx.strokeRect(x, y, w, h);
+        ctx.fillStyle = "rgba(0,0,0,0.4)";
+        ctx.fillRect(0, 0, canvas.width, y);
+        ctx.fillRect(0, y + h, canvas.width, canvas.height - y - h);
+        ctx.fillRect(0, y, x, h);
+        ctx.fillRect(x + w, y, canvas.width - x - w, h);
+      }
+    }
+    function pos(e) {
+      const r = canvas.getBoundingClientRect();
+      const t = e.touches ? e.touches[0] : e;
+      return { x: (t.clientX - r.left) * (canvas.width / r.width), y: (t.clientY - r.top) * (canvas.height / r.height) };
+    }
+    canvas.onmousedown = canvas.ontouchstart = e => { e.preventDefault(); const p = pos(e); startX = endX = p.x; startY = endY = p.y; dragging = true; };
+    canvas.onmousemove = canvas.ontouchmove = e => { if (!dragging) return; e.preventDefault(); const p = pos(e); endX = p.x; endY = p.y; drawSel(); };
+    canvas.onmouseup = canvas.ontouchend = () => { dragging = false; drawSel(); };
+    document.getElementById("cropApply").onclick = () => {
+      if (startX == null) { setCover(id, url); box.style.display = "none"; return; }
+      const x = Math.min(startX, endX) / scale, y = Math.min(startY, endY) / scale;
+      const w = Math.abs(endX - startX) / scale, h = Math.abs(endY - startY) / scale;
+      if (w < 10 || h < 10) { setCover(id, url); box.style.display = "none"; return; }
+      const c2 = document.createElement("canvas");
+      c2.width = w; c2.height = h;
+      c2.getContext("2d").drawImage(img, x, y, w, h, 0, 0, w, h);
+      setCover(id, c2.toDataURL("image/jpeg", 0.85));
+      box.style.display = "none";
+    };
+    document.getElementById("cropSkip").onclick = () => { setCover(id, url); box.style.display = "none"; };
+    document.getElementById("cropCancel").onclick = () => { box.style.display = "none"; };
+  };
+  img.onerror = () => { setCover(id, url); box.style.display = "none"; };
+  img.src = url;
+}
+
+function setCover(id, url) {
+  const m = getById(id);
+  if (!m) return;
+  m.coverUrl = url;
+  if (collection.find(x => x.id === id)) saveColl();
+  else saveManual();
+  render();
+}
+
+function badgeFxMap() {
+  const base = { uhd: "polish", blu: "polish", dvd: "polish" };
+  try { return Object.assign(base, JSON.parse(localStorage.getItem("md_badge_fx") || "{}")); }
+  catch (e) { return base; }
+}
+function saveBadgeFx(map) { localStorage.setItem("md_badge_fx", JSON.stringify(map)); }
+function discBadge(bucket, fxMap) {
+  if (bucket !== "uhd" && bucket !== "blu" && bucket !== "dvd") return "";
+  const fx = (fxMap && fxMap[bucket]) || "polish";
+  const text = bucket === "uhd" ? "4K" : bucket === "blu" ? "BLU" : "DVD";
+  const tip = bucket === "uhd" ? "4K" : bucket === "blu" ? "Blu-ray" : "DVD";
+  const safeFx = (fx === "shimmer" || fx === "glow") ? fx : "polish";
+  return '<span class="disc-badge kind-' + bucket + ' fx-' + safeFx + '" title="' + tip + '"><span class="disc-face">' + text + '</span></span>';
+}
+function discBucket(m) {
+  const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
+  const t = (m.title || "").toLowerCase();
+  if (/ultra|\buhd\b|\b4k\b/.test(d) || /\b4k\b|\buhd\b|ultra hd/.test(t)) return "uhd";
+  if (/blu/.test(d)) return "blu";
+  if (/\bdvd\b/.test(d)) return "dvd";
+  return "other";
+}
+function numRating(v) {
+  const n = parseFloat(String(v || "").replace(/[^\d.]/g, ""));
+  return isNaN(n) ? -1 : n;
+}
+function releaseTime(m) {
+  const raw = String(m.release || m.year || "").trim();
+  if (!raw) return 0;
+  const parsed = Date.parse(raw);
+  if (!isNaN(parsed)) return parsed;
+  const y = raw.match(/(19|20)\d{2}/);
+  return y ? Date.UTC(parseInt(y[0], 10), 0, 1) : 0;
+}
+function homoKey(m) {
+  return m.title + "|" + (m.barcode || "") + "|" + (m.edition || "");
+}
+function activeFilterCount() {
+  let n = 0;
+  if ($("filterDisc") && $("filterDisc").value) n++;
+  if ($("filterBout") && $("filterBout").value) n++;
+  if ($("filterHomo") && $("filterHomo").value) n++;
+  if ($("filterGuide") && $("filterGuide").value) n++;
+  return n;
+}
+function sortList(list, mode) {
+  const arr = list.slice();
+  const order = arr.map((_, i) => i);
+  let key;
+  if (mode === "az" || mode === "za") key = arr.map(m => (m.title || "").toLowerCase());
+  else if (mode === "imdb") key = arr.map(m => numRating(m.publicRating));
+  else if (mode === "friend") key = arr.map(m => numRating(friendRatings[norm(m.title)]));
+  else if (mode === "rel-new" || mode === "rel-old") key = arr.map(releaseTime);
+  else key = arr.map(m => m.addedAt || 0);
+  const dir = (mode === "za" || mode === "added-old" || mode === "rel-old") ? 1 : -1;
+  if (mode === "az") {
+    order.sort((i, j) => key[i].localeCompare(key[j]));
+  } else if (mode === "za") {
+    order.sort((i, j) => key[j].localeCompare(key[i]));
+  } else if (mode === "rel-new" || mode === "rel-old") {
+    order.sort((i, j) => {
+      const ra = key[i], rb = key[j];
+      if (!ra && !rb) return 0;
+      if (!ra) return 1;
+      if (!rb) return -1;
+      return mode === "rel-new" ? rb - ra : ra - rb;
+    });
+  } else {
+    order.sort((i, j) => dir * (key[i] - key[j]) || 0);
+  }
+  const out = new Array(order.length);
+  for (let n = 0; n < order.length; n++) out[n] = arr[order[n]];
+  return out;
+}
+
+function render() {
+  const q = norm($("q").value);
+  let all = getAll();
+  if (q) {
+    const matches = all.filter(m => searchBlob(m).includes(q));
+    const ids = new Set(matches.map(m => m.id));
+    matches.forEach(m => {
+      if (m.motherId && !ids.has(m.motherId)) {
+        const mother = getById(m.motherId);
+        if (mother) ids.add(mother.id);
+      }
+    });
+    all = all.filter(m => ids.has(m.id));
+  }
+  const disc = $("filterDisc") ? $("filterDisc").value : "";
+  const bout = $("filterBout") ? $("filterBout").value : "";
+  const homo = $("filterHomo") ? $("filterHomo").value : "";
+  if (disc) all = all.filter(m => discBucket(m) === disc);
+  if (bout === "yes") all = all.filter(m => !!(boutiqueFlags[m.id] || m.boutiqueLabel));
+  if (bout === "no") all = all.filter(m => !(boutiqueFlags[m.id] || m.boutiqueLabel));
+  if (homo === "yes") all = all.filter(m => !!homoFlags[homoKey(m)]);
+  if (homo === "no") all = all.filter(m => !homoFlags[homoKey(m)]);
+  const guide = $("filterGuide") ? $("filterGuide").value : "";
+  if (guide === "yes") all = all.filter(m => !!guideFlags[homoKey(m)]);
+  if (guide === "no") all = all.filter(m => !guideFlags[homoKey(m)]);
+  const mode = ($("sortSel") && $("sortSel").value) || "added-new";
+  all = sortList(all, mode);
+  const cap = 200;
+  const matched = all.length;
+  const shown = all.slice(0, cap);
+  $("counts").textContent = matched > shown.length
+    ? `${shown.length} of ${matched} shown / ${getAll().length} total`
+    : `${shown.length} shown / ${getAll().length} total`;
+  const nFilt = activeFilterCount();
+  if ($("filterBtn")) {
+    $("filterBtn").textContent = nFilt ? "Filter (" + nFilt + ")" : "Filter";
+    $("filterBtn").classList.toggle("on", nFilt > 0);
+  }
+  const fxMap = badgeFxMap();
+  const watchIds = new Set();
+  const watchById = new Map();
+  const watchByTitle = new Map();
+  (myWatchlist || []).forEach(w => {
+    if (!w) return;
+    if (w.imdbId) {
+      watchIds.add(w.imdbId);
+      watchById.set(w.imdbId, w);
+    }
+    const t = norm(watchTitle(w));
+    if (!t) return;
+    if (!watchByTitle.has(t)) watchByTitle.set(t, []);
+    watchByTitle.get(t).push(w);
+  });
+  $("out").innerHTML = shown.map(m => {
+    const key = m.title + "|" + (m.barcode||"") + "|" + (m.edition||"");
+    const isYes = !!homoFlags[key];
+    const bout = boutiqueFlags[m.id] || m.boutiqueLabel || "";
+    const boutNote = bout ? `<span class="flag" style="background:#5a3a00;color:#ffd580" data-boutique="${m.id}">Boutique: ${bout}</span>` : `<span class="flag" style="background:#333;color:#aaa" data-boutique="${m.id}">+ Boutique</span>`;
+    const pkgNote = m.fromPackage ? `<span class="flag pkg" data-mother-id="${m.motherId||""}" style="cursor:pointer">From mother</span>` : "";
+    const childDrop = (m.isMother && m.children && m.children.length)
+      ? (function() {
+          const opts = m.children.map(function(cid) {
+            const c = getById(cid);
+            if (!c) return "";
+            const t = String(c.title || cid).replace(/&/g, "&").replace(/</g, "<");
+            const extra = c.discType ? " | " + c.discType : "";
+            return '<option value="' + cid + '">' + t + extra + '</option>';
+          }).join("");
+          return '<select class="child-drop" size="5" data-mother="' + m.id + '"><option value="">Children (' + m.children.length + ')</option>' + opts + '</select>';
+        })()
+      : "";
+    const friendTag = friendTagFor(m.title);
+    const bucket = discBucket(m);
+    const badge = discBadge(bucket, fxMap);
+    const discText = badge ? "" : (m.discType ? " | " + m.discType : "");
+    const cover = m.coverUrl ? `<img class="card-cover" data-pick="${m.id}" src="${m.coverUrl}" alt="" loading="lazy" decoding="async" style="cursor:pointer">` : `<div class="card-cover" data-pick="${m.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
+    const added = formatAdded(m.addedAt);
+    const addedLine = added ? `<div class="card-added">Added ${added}</div>` : "";
+    const onWatch = (function() {
+      const id = String(m.imdbId || "").trim();
+      const y = movieYear(m);
+      if (id) {
+        const hit = watchById.get(id);
+        if (!hit) return false;
+        const wy = movieYear(hit);
+        if (y && wy && y !== wy) return false;
+        return true;
+      }
+      const list = watchByTitle.get(norm(m.title || "")) || [];
+      if (!list.length) return false;
+      if (y) {
+        const dated = list.filter(w => movieYear(w));
+        if (dated.length) return dated.some(w => movieYear(w) === y);
+        return false;
+      }
+      const years = [...new Set(list.map(movieYear).filter(Boolean))];
+      if (years.length > 1) return false;
+      return true;
+    })();
+    const watchNote = onWatch ? '<span class="flag" style="background:#2a2048;color:#c4b5fd">Watchlist</span>' : "";
+    return `<div class="card">
+      ${cover}
+      <div class="card-body">
+        <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
+        <div class="card-meta">${m.year || ""}${discText}${m.edition ? " | " + m.edition : ""}</div>
+        ${addedLine}
+        <div class="card-flags">
+          ${badge}
+          <span class="flag own">Owned</span>
+          ${genreTagHtml(m.genres)}
+          ${watchNote}
+          ${childDrop}
+          ${pkgNote}
+          ${boutNote}
+          <span class="flag ${guideFlags[key]?"guide-yes":"guide-no"}" data-guide="${key}">Guide: ${guideFlags[key]?"yes":"no"}</span>
+          <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
+          ${ratingBadge(m)}
+        </div>
+        ${ssOnCard() ? `<div class="card-ss" style="margin-top:6px;"><span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">ss: ${isYes?"yes":"no"}</span></div>` : ""}
+      </div>
+    </div>`;
+  }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
+
+}
+function bindInventoryClicks() {
+  const box = $("out");
+  if (!box || box.dataset.bound === "1") return;
+  box.dataset.bound = "1";
+  box.addEventListener("click", (e) => {
+    const pick = e.target.closest && e.target.closest("[data-pick]");
+    if (pick) { pickCover(pick.dataset.pick); return; }
+    const homo = e.target.closest && e.target.closest(".flag[data-key]");
+    if (homo) {
+      const k = homo.dataset.key;
+      homoFlags[k] = !homoFlags[k];
+      saveHomo();
+      render();
+      return;
+    }
+    const guide = e.target.closest && e.target.closest(".flag[data-guide]");
+    if (guide) {
+      const k = guide.dataset.guide;
+      guideFlags[k] = !guideFlags[k];
+      if (!guideFlags[k]) delete guideFlags[k];
+      saveGuide();
+      render();
+      return;
+    }
+    const bout = e.target.closest && e.target.closest("[data-boutique]");
+    if (bout) {
+      const id = bout.dataset.boutique;
+      const current = boutiqueFlags[id] || "";
+      const next = prompt("Boutique label (blank to clear):\n" + BOUTIQUE_LABELS.join(", "), current);
+      if (next === null) return;
+      const label = (next || "").trim();
+      if (label) boutiqueFlags[id] = label;
+      else delete boutiqueFlags[id];
+      saveBoutique();
+      render();
+      return;
+    }
+    const title = e.target.closest && e.target.closest(".card-title[data-id]");
+    if (title && !e.target.closest("select")) {
+      const id = title.dataset.id || "";
+      if (id) showLastId(id, title.textContent.trim());
+      openEdit(id);
+    }
+  });
+  box.addEventListener("change", (e) => {
+    const el = e.target.closest && e.target.closest(".child-drop");
+    if (!el) return;
+    const id = el.value;
+    el.value = "";
+    if (id) openEdit(id);
+  });
+}
+bindInventoryClicks();
+
+function openEdit(id) {
+  const m = getById(id);
+  if (!m) return;
+  $("editTitle").textContent = m.title;
+  $("editSource").value = m.source || "";
+  $("editEan").value = m.ean || m.barcode || "";
+  $("editImdbId").value = m.imdbId || "";
+  $("editDiscType").value = m.discType || "";
+  $("editAudioFormat").value = m.audioFormat || "";
+  $("editAudioChannels").value = m.audioChannels || "";
+  $("editEdition").value = m.edition || "";
+  $("editRelease").value = m.release || m.year || "";
+  $("editLanguages").value = m.languages || "";
+  $("editSubtitles").value = m.subtitles || "";
+  $("editRuntime").value = m.runtime || "";
+  $("editGenres").value = m.genres || "";
+  $("editDirector").value = m.director || "";
+  $("editComposer").value = m.composer || "";
+  $("editCinematographer").value = m.cinematographer || "";
+  $("editNotes").value = m.notes || "";
+  $("editCoverUrl").value = m.coverUrl || "";
+  const key = homoKey(m);
+  $("editSs").checked = !!homoFlags[key];
+  $("editPanel").dataset.id = id;
+  $("editPanel").classList.add("show");
+}
+$("editSave").onclick = () => {
+  const id = $("editPanel").dataset.id;
+  const m = getById(id);
+  if (!m) { $("editPanel").classList.remove("show"); return; }
+  m.source = ($("editSource").value || "").trim();
+  m.ean = ($("editEan").value || "").trim();
+  if (m.ean && !m.barcode) m.barcode = m.ean;
+  m.imdbId = ($("editImdbId").value || "").trim();
+  m.discType = ($("editDiscType").value || "").trim();
+  m.audioFormat = ($("editAudioFormat").value || "").trim();
+  m.audioChannels = ($("editAudioChannels").value || "").trim();
+  m.edition = ($("editEdition").value || "").trim();
+  m.release = ($("editRelease").value || "").trim();
+  m.languages = ($("editLanguages").value || "").trim();
+  m.subtitles = ($("editSubtitles").value || "").trim();
+  m.runtime = ($("editRuntime").value || "").trim();
+  m.genres = ($("editGenres").value || "").trim();
+  m.director = ($("editDirector").value || "").trim();
+  m.composer = ($("editComposer").value || "").trim();
+  m.cinematographer = ($("editCinematographer").value || "").trim();
+  m.notes = ($("editNotes").value || "").trim();
+  m.coverUrl = ($("editCoverUrl").value || "").trim();
+  const key = homoKey(m);
+  if ($("editSs").checked) homoFlags[key] = true;
+  else delete homoFlags[key];
+  saveHomo();
+  delete m._blob;
+  delete m._ysrc;
+  if (manualTitles.some(x => x.id === id)) saveManual();
+  else saveColl();
+  $("editPanel").classList.remove("show");
+  render();
+};
+$("editCancel").onclick = () => $("editPanel").classList.remove("show");
+
+function ssOnCard() {
+  return localStorage.getItem("md_ss_on_card") === "1";
+}
+function wireSsSetting() {
+  const el = $("ssOnCard");
+  if (!el) return;
+  el.checked = ssOnCard();
+  el.onchange = () => {
+    localStorage.setItem("md_ss_on_card", el.checked ? "1" : "0");
+    if (currentSection === "inventory") render();
+  };
+}
+wireSsSetting();
+  const field = $(fieldId), x = $(clearId);
+  if (!field || !x) return;
+  const toggle = () => { x.style.display = field.value ? "block" : "none"; };
+  field.oninput = toggle;
+  toggle();
+  x.onclick = () => { field.value = ""; field.dataset.barcode = ""; field.dataset.imdbId = ""; field.dataset.boutiqueLabel = ""; field.dataset.edition = ""; field.dataset.coverUrl = ""; toggle(); const box = $(fieldId === "motherTitle" ? "motherSuggest" : "childSuggest"); if (box) box.classList.remove("show"); };
+}
+wireClear("motherTitle", "motherClear");
+wireClear("childTitle", "childClear");
+$("motherTitle").oninput = (e) => { queueSuggest($("motherTitle").value, $("motherSuggest")); $("motherClear").style.display = $("motherTitle").value ? "block" : "none"; };
+$("childTitle").oninput = () => { queueSuggest($("childTitle").value, $("childSuggest")); const x = $("childClear"); if (x) x.style.display = $("childTitle").value ? "block" : "none"; };
+
+$("motherAddBtn").onclick = async () => {
+  try {
+    const field = $("motherTitle");
+    let t = (field.value || "").trim();
+    if (!t && field.dataset.barcode) t = field.dataset.barcode;
+    if (!t) { showPopup("Nothing to add."); return; }
+    const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
+    const barcode = field.dataset.barcode || typedBarcode;
+    const m = makeMother(t, {
+      barcode: barcode,
+      imdbId: field.dataset.imdbId || "",
+      publicRating: field.dataset.publicRating || "",
+      rawTitle: field.dataset.rawTitle || t,
+      discType: field.dataset.discType || detectDiscType(field.dataset.rawTitle || t),
+      boutiqueLabel: field.dataset.boutiqueLabel || "",
+      edition: field.dataset.edition || "",
+      coverUrl: field.dataset.coverUrl || ""
+    });
+    const boutHit = lookupBoutique(barcode);
+    if (boutHit) {
+      if (!m.boutiqueLabel && boutHit.label) m.boutiqueLabel = boutHit.label;
+      if (!m.edition && boutHit.edition) m.edition = boutHit.edition;
+      if (!m.coverUrl && boutHit.coverUrl) m.coverUrl = boutHit.coverUrl;
+      if (boutHit.title && /^\d+$/.test(String(m.title || ""))) m.title = boutHit.title;
+      if (boutHit.label) { boutiqueFlags[m.id] = boutHit.label; saveBoutique(); }
+    }
+    try {
+      const r = await refineWithOMDB(field.dataset.rawTitle || t);
+      if (r.refined) {
+        if (!m.imdbId && r.imdbId) m.imdbId = r.imdbId;
+        if (!m.publicRating && r.rating) m.publicRating = r.rating;
+        if (!m.release && r.release) m.release = r.release;
+        if (!m.runtime && r.runtime) m.runtime = r.runtime;
+        if (!m.genres && r.genres) m.genres = r.genres;
+        if (!m.director && r.director) m.director = r.director;
+        if (!m.languages && r.languages) m.languages = r.languages;
+        if (!m.source && r.source) m.source = r.source;
+        if (!m.discType && r.discType) m.discType = r.discType;
+      }
+    } catch(e) {}
+    manualTitles.unshift(m);
+    saveManual();
+    manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
+    field.value = "";
+    field.dataset.barcode = "";
+    field.dataset.imdbId = "";
+    field.dataset.publicRating = "";
+    $("motherSuggest").classList.remove("show");
+    showPopup("Added: " + m.title + " | ID: " + m.id + (boutHit ? " | Boutique: " + (boutHit.label || "matched") : " | no boutique match") + " | Total: " + getAll().length);
+    showLastId(m.id, m.title);
+    render();
+    if ($("counts")) $("counts").textContent = getAll().length + " shown / " + getAll().length + " total";
+  } catch(err) {
+    showPopup("Add failed: " + (err && err.message ? err.message : err));
+  }
+};
+
+$("childAddBtn").onclick = async () => {
+  const t = $("childTitle").value.trim();
+  const mid = $("motherIdInput").value.trim();
+  if (!t || !mid) { showPopup("Need child title and mother ID."); return; }
+  const mother = getById(mid);
+  if (!mother || !mother.isMother) { showPopup("Mother ID not found."); return; }
+  const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
+  const barcode = $("childTitle").dataset.barcode || typedBarcode || mother.barcode || "";
+  const c = makeChild(t, mid, { barcode: barcode, imdbId: $("childTitle").dataset.imdbId || "", publicRating: $("childTitle").dataset.publicRating || "", genres: $("childTitle").dataset.genres || "" });
+  try {
+    const r = await refineWithOMDB($("childTitle").dataset.rawTitle || t);
+    if (r && r.refined) {
+      if (!c.imdbId && r.imdbId) c.imdbId = r.imdbId;
+      if (!c.genres && r.genres) c.genres = r.genres;
+      if (!c.director && r.director) c.director = r.director;
+      if (!c.runtime && r.runtime) c.runtime = r.runtime;
+    }
+  } catch (e) {}
+  const boutHit = lookupBoutique(barcode);
+  if (boutHit) {
+    if (!c.boutiqueLabel && boutHit.label) c.boutiqueLabel = boutHit.label;
+    if (!c.edition && boutHit.edition) c.edition = boutHit.edition;
+    if (!c.coverUrl && boutHit.coverUrl) c.coverUrl = boutHit.coverUrl;
+    if (boutHit.title && /^\d+$/.test(c.title)) c.title = boutHit.title;
+    if (boutHit.label) { boutiqueFlags[c.id] = boutHit.label; saveBoutique(); }
+  }
+  manualTitles.push(c);
+  mother.children = mother.children || [];
+  mother.children.push(c.id);
+  saveManual();
+  $("childTitle").value = "";
+  $("childTitle").dataset.barcode = "";
+  $("childTitle").dataset.imdbId = "";
+  $("childTitle").dataset.publicRating = "";
+  $("motherIdInput").value = "";
+  $("childSuggest").classList.remove("show");
+  showPopup("Child added to mother: " + c.title);
+  showLastId(c.id, c.title);
+  render();
+};
+
+$("motherScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; $("barcodeStatus").innerHTML = "Scan tapped"; startScan("mother"); };
+$("childScanBtn").onclick = () => { $("barcodeStatus").style.display = "block"; $("barcodeStatus").innerHTML = "Scan tapped"; startScan("child"); };
+
+let friendInvTitles = JSON.parse(localStorage.getItem("md_friend_inv") || "[]");
+let friendRatings = JSON.parse(localStorage.getItem("md_friend_ratings") || "{}");
+let myWatchlist = [];
+try { myWatchlist = JSON.parse(localStorage.getItem("md_my_watch") || "[]"); } catch (e) { myWatchlist = []; }
+if (!Array.isArray(myWatchlist)) myWatchlist = [];
+myWatchlist = myWatchlist.map(watchItem);
+let friendWatchlist = JSON.parse(localStorage.getItem("md_friend_watch") || "[]");
+let currentSection = "inventory";
+let watchMode = "personal";
+
+let friendInvRef = null;
+let friendInvSet = null;
+function friendTagFor(title) {
+  if (friendInvRef !== friendInvTitles) {
+    friendInvRef = friendInvTitles;
+    friendInvSet = new Set();
+    for (let i = 0; i < friendInvTitles.length; i++) friendInvSet.add(normTitle(friendInvTitles[i]));
+  }
+  const n = normTitle(title);
+  const inInv = friendInvSet.has(n);
+  const rating = friendRatings[n];
+  if (!inInv && !rating) return "";
+  const name = ($("friendName") && $("friendName").value.trim()) || "Friend";
+  const r = rating ? " | " + rating : "";
+  return ` <span class="flag" style="background:#2a1a3a;color:#d0a0e0;margin-left:6px;">${name}${r}</span>`;
+}
+
+function showSettings() {
+  const stores = [
+    { key: "md_manual", label: "Manual titles (added in app)", data: manualTitles },
+    { key: "md_coll", label: "Loaded collection", data: collection },
+    { key: "md_my_ratings", label: "Your IMDb ratings", data: myRatingsById, count: Object.keys(myRatingsById).length || Object.keys(myRatings).length },
+    { key: "md_friend_inv", label: "Friend inventory", data: friendInvTitles },
+    { key: "md_friend_ratings", label: "Friend ratings", data: friendRatings },
+    { key: "md_my_watch", label: "Personal watchlist", data: myWatchlist },
+    { key: "md_friend_watch", label: "Friend watchlist", data: friendWatchlist },
+    { key: "md_homo", label: "Homosexual-scenes flags", data: homoFlags },
+    { key: "md_guide", label: "Parents-guide flags", data: guideFlags },
+    { key: "md_boutique", label: "Boutique labels", data: boutiqueFlags },
+    { key: "boutique-catalog", label: "Boutique catalog (barcode index)", data: boutiqueCatalog }
+  ];
+  const box = $("settingsOut");
+  const rows = stores.map(s => {
+    const n = typeof s.count === "number" ? s.count : (Array.isArray(s.data) ? s.data.length : Object.keys(s.data || {}).length);
+    return `<div style="display:flex;justify-content:space-between;align-items:center;padding:8px 0;border-bottom:1px solid #2a2a2a;">
+      <div>${s.label}<br><span style="color:#888;font-size:0.75rem">${s.key} | ${n} items</span></div>
+      <button data-clear="${s.key}" style="height:28px;padding:0 10px;font-size:0.75rem;background:#3a1a1a;color:#f88;">Clear</button>
+    </div>`;
+  }).join("");
+  const popupOff = localStorage.getItem("md_popup_off") === "1" || sessionStorage.getItem("md_popup_off") === "1";
+  box.innerHTML = `<b>Settings - stored in this browser</b>
+    <div style="color:#888;font-size:0.8rem;margin:6px 0 10px;">Nothing is saved to a folder until you tap Export Library. Exported CSVs go to your phone/browser Downloads folder.</div>
+    <div style="color:#888;font-size:0.75rem;margin:0 0 10px;">This product uses the TMDB API but is not endorsed or certified by TMDB.</div>
+    <div style="padding:8px 0;border-bottom:1px solid #2a2a2a;">
+      <label style="display:flex;align-items:center;gap:8px;">
+        <input type="checkbox" id="settingsPopup" ${popupOff ? "" : "checked"}>
+        Popups (confirmations after Add, Clear, etc.)
+      </label>
+      <div style="color:#888;font-size:0.75rem;margin-top:4px;">Uncheck to silence them. Checking this turns them back on.</div>
+    </div>
+    ${rows}`;
+  const pop = $("settingsPopup");
+  if (pop) pop.onchange = () => {
+    if (pop.checked) {
+      localStorage.removeItem("md_popup_off");
+      sessionStorage.removeItem("md_popup_off");
+    } else {
+      localStorage.setItem("md_popup_off", "1");
+    }
+  };
+  box.querySelectorAll("[data-clear]").forEach(btn => {
+    btn.onclick = () => {
+      const key = btn.dataset.clear;
+      if (!confirm("Clear " + key + "?")) return;
+      localStorage.removeItem(key);
+      if (key === "md_manual") manualTitles = [];
+      if (key === "md_coll") { collection = []; bustLookups(); }
+      if (key === "md_my_ratings") { myRatings = {}; myRatingsById = {}; idbClear("ratings"); }
+      if (key === "md_friend_inv") friendInvTitles = [];
+      if (key === "md_manual") bustLookups();
+      if (key === "md_friend_ratings") friendRatings = {};
+      if (key === "md_my_watch") { myWatchlist = []; idbClear("watch"); }
+      if (key === "md_friend_watch") friendWatchlist = [];
+      if (key === "md_homo") Object.keys(homoFlags).forEach(k => delete homoFlags[k]);
+      if (key === "md_guide") Object.keys(guideFlags).forEach(k => delete guideFlags[k]);
+      if (key === "md_boutique") Object.keys(boutiqueFlags).forEach(k => delete boutiqueFlags[k]);
+      if (key === "boutique-catalog") { boutiqueCatalog = {}; idbClear("boutique"); }
+      showPopup("Cleared " + key);
+      showSettings();
+      render();
+    };
+  });
+}
+function showSection(name) {
+  currentSection = name;
+  ["inventory","add","watch","stream","settings"].forEach(s => {
+    const sec = $("sec" + s.charAt(0).toUpperCase() + s.slice(1));
+    const btn = $("tab" + s.charAt(0).toUpperCase() + s.slice(1));
+    if (sec) sec.classList.toggle("active", s === name);
+    if (btn) btn.classList.toggle("active", s === name);
+  });
+  if (name === "inventory") render();
+  if (name === "watch") renderWatch();
+  if (name === "stream") clearStreamDisplay();
+  if (name === "settings") showSettings();
+}
+
+const STREAM_SERVICES = [
+  { id: 9, name: "Prime Video", group: "yours", kind: "sub" },
+  { id: 583, name: "MGM+ on Prime", group: "yours", kind: "sub" },
+  { id: 2754, name: "Howdy on Prime", group: "yours", kind: "sub" },
+  { id: 204, name: "Shudder on Prime", group: "yours", kind: "sub" },
+  { id: 2303, name: "Paramount+ Premium", group: "yours", kind: "sub" },
+  { id: 43, name: "Starz", group: "yours", kind: "sub" },
+  { id: 337, name: "Disney+", group: "other", kind: "sub" },
+  { id: 15, name: "Hulu", group: "other", kind: "sub" },
+  { id: 1899, name: "Max", group: "other", kind: "sub" },
+  { id: 350, name: "Apple TV+", group: "other", kind: "sub" },
+  { id: 386, name: "Peacock Premium", group: "other", kind: "sub" },
+  { id: 387, name: "Peacock Premium Plus", group: "other", kind: "sub" },
+  { id: 283, name: "Crunchyroll", group: "other", kind: "sub" },
+  { id: 526, name: "AMC+", group: "other", kind: "sub" },
+  { id: 258, name: "Criterion Channel", group: "other", kind: "sub" },
+  { id: 151, name: "BritBox", group: "other", kind: "sub" },
+  { id: 11, name: "MUBI", group: "other", kind: "sub" },
+  { id: 34, name: "MGM+", group: "other", kind: "sub" },
+  { id: 99, name: "Shudder", group: "other", kind: "sub" },
+  { id: 2616, name: "Paramount+ Essential", group: "other", kind: "sub" },
+  { id: 1794, name: "Starz on Prime", group: "other", kind: "sub" },
+  { id: 10, name: "Amazon Video", group: "shop", kind: "shop" },
+  { id: 2, name: "Apple TV Store", group: "shop", kind: "shop" },
+  { id: 3, name: "Google Play Movies", group: "shop", kind: "shop" },
+  { id: 192, name: "YouTube", group: "shop", kind: "shop" },
+  { id: 7, name: "Fandango at Home", group: "shop", kind: "shop" }
+];
+const STREAM_DEFAULTS = [9, 583, 2754, 204, 2303, 43];
+let streamCache = {};
+let streamToken = 0;
+function streamPrefs() {
+  try {
+    const saved = JSON.parse(localStorage.getItem("md_stream_prefs") || "null");
+    if (Array.isArray(saved)) return saved.map(Number);
+  } catch (e) {}
+  return STREAM_DEFAULTS.slice();
+}
+function saveStreamPrefs(ids) {
+  localStorage.setItem("md_stream_prefs", JSON.stringify(ids));
+}
+function streamChecked() {
+  const on = new Set(streamPrefs());
+  return STREAM_SERVICES.filter(s => on.has(s.id));
+}
+function streamKey(item) {
+  const id = String(item.imdbId || "").trim();
+  if (id) return id;
+  if (item && item.tmdbId) return "t:" + (item.tmdbKind === "tv" ? "tv" : "movie") + ":" + item.tmdbId;
+  return "n:" + norm(item.title || "") + ":" + String(item.year || "");
+}
+function inventoryIndex() {
+  if (invIndex) return invIndex;
+  const byId = new Map();
+  const byTitle = new Map();
+  const all = getAll();
+  for (let i = 0; i < all.length; i++) {
+    const m = all[i];
+    if (!m) continue;
+    const id = String(m.imdbId || "").trim();
+    if (id) {
+      const list = byId.get(id);
+      if (list) list.push(m); else byId.set(id, [m]);
+    }
+    const n = norm(m.title);
+    if (n) {
+      const list = byTitle.get(n);
+      if (list) list.push(m); else byTitle.set(n, [m]);
+    }
+  }
+  invIndex = { byId: byId, byTitle: byTitle };
+  return invIndex;
+}
+function streamInventoryHits(item) {
+  const idx = inventoryIndex();
+  const id = String(item.imdbId || "").trim();
+  if (id && idx.byId.has(id)) return idx.byId.get(id);
+  const n = norm(item.title || "");
+  const y = movieYear(item);
+  if (!n || !idx.byTitle.has(n)) return [];
+  const list = idx.byTitle.get(n);
+  if (!y) return list;
+  return list.filter(m => !movieYear(m) || movieYear(m) === y);
+}
+function genreKeyName(s) { return String(s || "").toLowerCase().replace(/[^a-z0-9]/g, ""); }
+function splitGenreTags(s) { return String(s || "").split(/[,/|]/).map(g => g.trim()).filter(Boolean); }
+function sameGenre(a, b) { return genreKeyName(a) && genreKeyName(a) === genreKeyName(b); }
+function streamIsAny() {
+  return ($("streamSource") && $("streamSource").value) === "any";
+}
+function itemHasGenre(item, name) {
+  if (!name) return true;
+  const tags = streamGenreNames(item);
+  if (!tags.length) return streamIsAny();
+  return tags.some(g => sameGenre(g, name));
+}
+function genreTagHtml(genres) {
+  return splitGenreTags(genres).map(g => '<span class="flag" style="background:#1a2a22;color:#9dccb0">' + escWatch(g) + '</span>').join("");
+}
+function streamPassesOwn(item) {
+  const homo = $("streamHomo") ? $("streamHomo").value : "";
+  if (!homo) return true;
+  const hits = streamInventoryHits(item);
+  if (!hits.length) return homo !== "yes";
+  return hits.some(m => {
+    const hk = homoKey(m);
+    if (homo === "yes" && !homoFlags[hk]) return false;
+    if (homo === "no" && homoFlags[hk]) return false;
+    return true;
+  });
+}
+function streamGenreNames(item) {
+  const set = [];
+  const add = g => {
+    const t = String(g || "").trim();
+    if (t && !set.some(x => sameGenre(x, t))) set.push(t);
+  };
+  splitGenreTags(item && item.genres).forEach(add);
+  const rec = item && streamCache[streamKey(item)];
+  if (rec && rec.genres) rec.genres.forEach(add);
+  if (!set.length) streamInventoryHits(item).forEach(m => splitGenreTags(m.genres).forEach(add));
+  return set;
+}
+function streamHay(item) {
+  return [item.title, item.year, item.genres, item.director, item.runtime, item.imdbId, item.imdbRating, item.yours, item.date, item.released, item.type].join(" ").toLowerCase();
+}
+function streamFilteredItems() {
+  const q = (($("streamQ") && $("streamQ").value) || "").trim().toLowerCase();
+  const genre = ($("streamGenre") && $("streamGenre").value) || "";
+  const subg = ($("streamSub") && $("streamSub").value) || "";
+  const any = streamIsAny();
+  return streamSourceItems().filter(item => {
+    if (q && !any && streamHay(item).indexOf(q) < 0) return false;
+    if (!any && !itemHasGenre(item, genre)) return false;
+    if (!any && !itemHasGenre(item, subg)) return false;
+    if (!streamPassesOwn(item)) return false;
+    return true;
+  });
+}
+let streamAny = [];
+let streamAnyNote = "";
+let streamAnySeq = 0;
+let streamAnyCtrl = null;
+let streamAnyTimer = 0;
+const TMDB_MOVIE_GENRE = { Action: 28, Adventure: 12, Animation: 16, Comedy: 35, Crime: 80, Documentary: 99, Drama: 18, Family: 10751, Fantasy: 14, History: 36, Horror: 27, Music: 10402, Mystery: 9648, Romance: 10749, "Sci-Fi": 878, Thriller: 53, War: 10752, Western: 37 };
+const TMDB_TV_GENRE = { Action: 10759, Adventure: 10759, Animation: 16, Comedy: 35, Crime: 80, Documentary: 99, Drama: 18, Family: 10751, Fantasy: 10765, Mystery: 9648, News: 10763, "Reality-TV": 10764, "Sci-Fi": 10765, "Talk-Show": 10767, War: 10768, Western: 37 };
+const GENRE_BY_ID = { 28: "Action", 12: "Adventure", 16: "Animation", 35: "Comedy", 80: "Crime", 99: "Documentary", 18: "Drama", 10751: "Family", 14: "Fantasy", 36: "History", 27: "Horror", 10402: "Music", 9648: "Mystery", 10749: "Romance", 878: "Sci-Fi", 53: "Thriller", 10752: "War", 37: "Western", 10759: "Action", 10765: "Sci-Fi", 10768: "War", 10763: "News", 10764: "Reality-TV", 10767: "Talk-Show" };
+const STREAM_SKIP_OPEN = { adult: 1, eroticthriller: 1, steamyromance: 1 };
+const tmdbKeywordCache = {};
+function streamGenreValue() { return ($("streamGenre") && $("streamGenre").value) || ""; }
+function streamSubValue() { return ($("streamSub") && $("streamSub").value) || ""; }
+function streamCatalog() { return streamIsAny() || !!(streamGenreValue() || streamSubValue()); }
+const SUBGENRE_TAILS = ["Horror","Comedy","Drama","Documentary","Thriller","Mystery","Romance","Sci-Fi","Fantasy","Western","Action","Adventure","Animation","Crime","Family","War","Musical","Reality TV"];
+function subgenreParts(name) {
+  const raw = String(name || "").trim();
+  for (let i = 0; i < SUBGENRE_TAILS.length; i++) {
+    const tail = SUBGENRE_TAILS[i];
+    const re = new RegExp("\\s+" + tail.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "$", "i");
+    if (!re.test(raw)) continue;
+    const short = raw.replace(re, "").trim();
+    const genre = tail === "Musical" ? "Music" : (tail === "Reality TV" ? "Reality-TV" : tail);
+    return { short: short, genre: genre };
+  }
+  return { short: "", genre: "" };
+}
+function queueStreamAny() {
+  clearTimeout(streamAnyTimer);
+  if (!streamCatalog()) return;
+  streamAnyTimer = setTimeout(loadStreamAny, 300);
+}
+function parseAnyQuery(raw) {
+  const s = String(raw || "").trim();
+  let text = s, year = "", month = "", day = "";
+  const iso = s.match(/^((19|20)\d{2})(?:-(\d{2})(?:-(\d{2}))?)?$/);
+  if (iso) {
+    text = ""; year = iso[1]; month = iso[3] || ""; day = iso[4] || "";
+  } else {
+    const trail = s.match(/^(.*?)(?:\s+|,\s*)((19|20)\d{2})$/);
+    if (trail && trail[1].trim().length >= 2) { text = trail[1].trim(); year = trail[2]; }
+  }
+  if (text.length < 2) text = "";
+  let dayStart = "", dayEnd = "";
+  if (year && month && day) { dayStart = year + "-" + month + "-" + day; dayEnd = dayStart; }
+  else if (year && month) {
+    dayStart = year + "-" + month + "-01";
+    const n = new Date(Date.UTC(Number(year), Number(month), 0)).getUTCDate();
+    dayEnd = year + "-" + month + "-" + String(n).padStart(2, "0");
+  }
+  return { text: text, year: year, dayStart: dayStart, dayEnd: dayEnd };
+}
+function tmdbItem(row, kind, extra, castName) {
+  const date = row.release_date || row.first_air_date || "";
+  const names = [];
+  const add = g => { const t = String(g || "").trim(); if (t && !names.some(n => sameGenre(n, t))) names.push(t); };
+  (row.genre_ids || []).forEach(id => add(GENRE_BY_ID[id]));
+  splitGenreTags(extra).forEach(add);
+  return {
+    title: row.title || row.name || "",
+    imdbId: "",
+    tmdbId: row.id,
+    tmdbKind: kind,
+    year: date ? date.slice(0, 4) : "",
+    type: kind === "tv" ? "tvSeries" : "movie",
+    imdbRating: "",
+    yours: "",
+    genres: names.join(", "),
+    director: "",
+    cast: castName || "",
+    runtime: "",
+    date: date,
+    released: date
+  };
+}
+async function tmdbGet(path, params, signal) {
+  let url = "https://api.themoviedb.org/3" + path + "?api_key=" + encodeURIComponent(TMDB_KEY);
+  Object.keys(params || {}).forEach(k => {
+    if (params[k] !== "" && params[k] != null) url += "&" + encodeURIComponent(k) + "=" + encodeURIComponent(params[k]);
+  });
+  const res = await fetch(url, signal ? { signal: signal } : {});
+  if (res.status === 429) throw new Error("429");
+  if (!res.ok) throw new Error("bad");
+  return res.json();
+}
+async function tmdbKeywordId(name, signal) {
+  const key = genreKeyName(name);
+  if (!key) return "";
+  if (tmdbKeywordCache[key]) return tmdbKeywordCache[key];
+  const d = await tmdbGet("/search/keyword", { query: name }, signal);
+  const rows = (d && d.results) || [];
+  const hit = rows.find(r => genreKeyName(r.name) === key);
+  const id = hit && hit.id ? String(hit.id) : "";
+  if (id) tmdbKeywordCache[key] = id;
+  return id;
+}
+async function discoverKind(kind, genreId, keywordId, parsed, signal) {
+  const build = (strict) => {
+    const params = { sort_by: parsed.dayStart ? "popularity.desc" : "vote_count.desc", include_adult: "false", page: "1" };
+    if (strict && !parsed.dayStart) params["vote_count.gte"] = "50";
+    if (genreId) params.with_genres = String(genreId);
+    if (keywordId) params.with_keywords = String(keywordId);
+    if (parsed.dayStart) {
+      const prefix = kind === "tv" ? "first_air_date" : "primary_release_date";
+      params[prefix + ".gte"] = parsed.dayStart;
+      params[prefix + ".lte"] = parsed.dayEnd;
+    } else if (parsed.year) {
+      params[kind === "tv" ? "first_air_date_year" : "primary_release_year"] = parsed.year;
+    }
+    return params;
+  };
+  const pull = async (params) => {
+    const d = await tmdbGet(kind === "tv" ? "/discover/tv" : "/discover/movie", params, signal);
+    return ((d && d.results) || []).filter(r => r && (r.title || r.name) && !r.adult);
+  };
+  let rows = await pull(build(true));
+  if (!rows.length) rows = await pull(build(false));
+  return rows.slice(0, 10);
+}
+function keepTextRow(row, kind, genre, movieGenre, tvGenre) {
+  if (!genre) return true;
+  if (kind === "tv") {
+    if (!tvGenre) return false;
+    return (row.genre_ids || []).map(String).indexOf(String(tvGenre)) >= 0;
+  }
+  if (!movieGenre) return !tvGenre;
+  return (row.genre_ids || []).map(String).indexOf(String(movieGenre)) >= 0;
+}
+async function loadStreamAny() {
+  const parsed = parseAnyQuery(streamIsAny() ? (($("streamQ") && $("streamQ").value) || "") : "");
+  const genre = streamGenreValue();
+  const subg = streamSubValue();
+  const parts = subgenreParts(subg);
+  const seq = ++streamAnySeq;
+  if (streamAnyCtrl) streamAnyCtrl.abort();
+  const paint = () => { if (seq === streamAnySeq && currentSection === "stream") renderStream(); };
+  if (STREAM_SKIP_OPEN[genreKeyName(genre)] || STREAM_SKIP_OPEN[genreKeyName(subg)]) {
+    streamAny = [];
+    streamAnyNote = "That category is not searched.";
+    paint();
+    return;
+  }
+  if (!parsed.text && !parsed.year && !genre && !subg) {
+    streamAny = [];
+    streamAnyNote = "";
+    paint();
+    return;
+  }
+  streamAny = [];
+  streamAnyNote = "Searching...";
+  paint();
+  streamAnyCtrl = typeof AbortController === "function" ? new AbortController() : null;
+  const signal = streamAnyCtrl ? streamAnyCtrl.signal : undefined;
+  try {
+    const genreName = genre || parts.genre || "";
+    const movieGenre = TMDB_MOVIE_GENRE[genreName] || 0;
+    const tvGenre = TMDB_TV_GENRE[genreName] || 0;
+    const keywordName = subg ? ((parts.short && parts.short.split(/\s+/).length >= 2) ? parts.short : subg) : ((!movieGenre && !tvGenre && genre) ? genre : "");
+    let keywordId = keywordName ? await tmdbKeywordId(keywordName, signal) : "";
+    if (!keywordId && subg && keywordName !== subg) keywordId = await tmdbKeywordId(subg, signal);
+    if (seq !== streamAnySeq) return;
+    const extra = [genre, subg].filter(Boolean).join(", ");
+    let rows = [];
+    if (!parsed.text) {
+      if (keywordName && !keywordId && !movieGenre && !tvGenre) {
+        streamAny = [];
+        streamAnyNote = "No open list for that.";
+        paint();
+        return;
+      }
+      const browseMovie = !!movieGenre || (!tvGenre && !!(keywordId || parsed.year || parsed.dayStart));
+      const browseTv = !!tvGenre || (!movieGenre && !!(keywordId || parsed.year || parsed.dayStart));
+      if (browseMovie) (await discoverKind("movie", movieGenre, keywordId, parsed, signal)).forEach(r => rows.push(tmdbItem(r, "movie", extra, "")));
+      if (seq !== streamAnySeq) return;
+      if (browseTv) (await discoverKind("tv", tvGenre, keywordId, parsed, signal)).forEach(r => rows.push(tmdbItem(r, "tv", extra, "")));
+    } else {
+      const movieParams = { query: parsed.text, include_adult: "false", page: "1" };
+      const tvParams = { query: parsed.text, include_adult: "false", page: "1" };
+      if (parsed.year && !parsed.dayStart) { movieParams.year = parsed.year; tvParams.first_air_date_year = parsed.year; }
+      const found = await Promise.all([
+        tmdbGet("/search/movie", movieParams, signal),
+        tmdbGet("/search/tv", tvParams, signal),
+        tmdbGet("/search/person", { query: parsed.text, include_adult: "false", page: "1" }, signal)
+      ]);
+      if (seq !== streamAnySeq) return;
+      const seen = new Set();
+      const add = item => {
+        if (!item.title || RATING_SKIP[String(item.type || "").toLowerCase()]) return;
+        const k = item.tmdbKind + ":" + item.tmdbId;
+        if (seen.has(k)) return;
+        seen.add(k);
+        rows.push(item);
+      };
+      ((found[0] && found[0].results) || []).filter(r => r && !r.adult && keepTextRow(r, "movie", genre, movieGenre, tvGenre)).slice(0, 8).forEach(r => add(tmdbItem(r, "movie", "", "")));
+      ((found[1] && found[1].results) || []).filter(r => r && !r.adult && keepTextRow(r, "tv", genre, movieGenre, tvGenre)).slice(0, 4).forEach(r => add(tmdbItem(r, "tv", "", "")));
+      const person = ((found[2] && found[2].results) || []).find(r => r && !r.adult);
+      if (person && rows.length < 20) {
+        const cred = await tmdbGet("/person/" + person.id + "/combined_credits", {}, signal);
+        if (seq !== streamAnySeq) return;
+        let cast = ((cred && cred.cast) || []).filter(r => r && (r.title || r.name) && !r.adult);
+        if (parsed.year) cast = cast.filter(r => String(r.release_date || r.first_air_date || "").slice(0, 4) === parsed.year);
+        cast.sort((a, b) => (b.popularity || 0) - (a.popularity || 0));
+        cast.slice(0, 10).forEach(r => {
+          const kind = r.media_type === "tv" ? "tv" : "movie";
+          if (!keepTextRow(r, kind, genre, movieGenre, tvGenre)) return;
+          add(tmdbItem(r, kind, "", person.name || parsed.text));
+        });
+      }
+    }
+    if (seq !== streamAnySeq) return;
+    streamAny = rows.filter(r => r && r.title).slice(0, 20);
+    streamAnyNote = streamAny.length ? "" : "Nothing found.";
+  } catch (e) {
+    if (e && e.name === "AbortError") return;
+    if (seq !== streamAnySeq) return;
+    streamAny = [];
+    streamAnyNote = String(e && e.message) === "429" ? "Lookup was busy. Try again." : "Search failed.";
+  }
+  paint();
+}
+function streamSourceItems() {
+  const src = ($("streamSource") && $("streamSource").value) || "watch";
+  if (src === "any" || streamGenreValue() || streamSubValue()) return streamAny.slice();
+  if (src === "ratings") {
+    const rows = [];
+    const seen = new Set();
+    Object.keys(myRatingsById || {}).forEach(k => {
+      const r = myRatingsById[k];
+      if (!r || !r.title) return;
+      const key = r.imdbId || norm(r.title);
+      if (seen.has(key)) return;
+      seen.add(key);
+      rows.push({ title: r.title, imdbId: r.imdbId || "", year: r.year || "", type: r.type || "", imdbRating: "", yours: r.rating || "", genres: r.genres || "", director: r.director || "", runtime: r.runtime || "", date: r.date || "", released: r.released || "" });
+    });
+    if (!rows.length) {
+      Object.keys(myRatings || {}).forEach(k => {
+        const list = Array.isArray(myRatings[k]) ? myRatings[k] : [];
+        list.forEach(r => {
+          if (!r || !r.title) return;
+          rows.push({ title: r.title, imdbId: r.imdbId || "", year: r.year || "", type: r.type || "", imdbRating: "", yours: r.rating || "", genres: r.genres || "", director: r.director || "", runtime: r.runtime || "", date: r.date || "", released: r.released || "" });
+        });
+      });
+    }
+    return rows.filter(r => !RATING_SKIP[String(r.type || "").toLowerCase()]);
+  }
+  return (myWatchlist || []).filter(w => w && !RATING_SKIP[String(w.type || "").toLowerCase()]).map(w => ({
+    title: watchTitle(w),
+    imdbId: w.imdbId || "",
+    year: w.year || "",
+    type: w.type || "",
+    imdbRating: w.imdbRating || "",
+    yours: "",
+    genres: w.genres || "",
+    director: w.director || "",
+    runtime: w.runtime || "",
+    date: w.date || "",
+    released: w.released || ""
+  }));
+}
+let servicesReady = false;
+function paintServices() {
+  servicesReady = true;
+  const on = new Set(streamPrefs());
+  const boxes = { yours: $("streamYours"), other: $("streamOther"), shop: $("streamShop") };
+  Object.keys(boxes).forEach(k => { if (boxes[k]) boxes[k].innerHTML = ""; });
+  STREAM_SERVICES.forEach(svc => {
+    const box = boxes[svc.group];
+    if (!box) return;
+    const label = document.createElement("label");
+    if (on.has(svc.id)) label.className = "on";
+    const input = document.createElement("input");
+    input.type = "checkbox";
+    input.checked = on.has(svc.id);
+    input.setAttribute("aria-label", svc.name);
+    input.onchange = () => {
+      const ids = streamPrefs().filter(id => id !== svc.id);
+      if (input.checked) ids.push(svc.id);
+      saveStreamPrefs(ids);
+      label.classList.toggle("on", input.checked);
+      renderStream();
+    };
+    label.appendChild(input);
+    label.appendChild(document.createTextNode(svc.name));
+    box.appendChild(label);
+  });
+}
+function serviceMatch(rec, svc) {
+  const hits = (rec && rec.hits) || [];
+  if (svc.kind === "shop") return hits.filter(h => h.id === svc.id && (h.offer === "rent" || h.offer === "buy"));
+  return hits.filter(h => h.id === svc.id && h.offer === "sub");
+}
+function offerWord(hits) {
+  const kinds = [];
+  hits.forEach(h => {
+    const w = h.offer === "sub" ? "Streaming" : (h.offer === "rent" ? "Rent" : "Buy");
+    if (kinds.indexOf(w) < 0) kinds.push(w);
+  });
+  return kinds.join(" · ");
+}
+async function idbPutOne(store, key, val) {
+  const db = await openDb();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(store, "readwrite");
+    tx.objectStore(store).put(val, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+async function loadStreamCache() {
+  try { streamCache = await idbGetAll("stream") || {}; }
+  catch (e) { streamCache = {}; }
+}
+async function fetchStream(item) {
+  let kind = "movie";
+  let id = null;
+  if (item.tmdbId) { id = item.tmdbId; kind = item.tmdbKind === "tv" ? "tv" : "movie"; }
+  else if (item.imdbId) {
+    const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(item.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
+    if (res.status === 429) throw new Error("429");
+    const d = await res.json();
+    if (d.movie_results && d.movie_results[0]) { kind = "movie"; id = d.movie_results[0].id; }
+    else if (d.tv_results && d.tv_results[0]) { kind = "tv"; id = d.tv_results[0].id; }
+  }
+  if (!id && item.title) {
+    let url = "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(item.title) + "&api_key=" + TMDB_KEY;
+    const y = String(item.year || "").match(/(19|20)\d{2}/);
+    if (y) url += "&year=" + y[0];
+    const res = await fetch(url);
+    const d = await res.json();
+    if (d.results && d.results[0]) { id = d.results[0].id; kind = "movie"; }
+  }
+  if (!id) return { genres: [], hits: [], miss: true, at: Date.now() };
+  const res = await fetch("https://api.themoviedb.org/3/" + kind + "/" + id + "?append_to_response=watch/providers&api_key=" + TMDB_KEY);
+  if (res.status === 429) throw new Error("429");
+  const d = await res.json();
+  const genres = (d.genres || []).map(g => g.name).filter(Boolean);
+  const us = (d["watch/providers"] && d["watch/providers"].results && d["watch/providers"].results.US) || {};
+  const hits = [];
+  const take = (arr, offer) => (arr || []).forEach(p => {
+    if (!p || STREAM_SERVICES.every(s => s.id !== p.provider_id)) return;
+    hits.push({ id: p.provider_id, name: p.provider_name || "", offer: offer });
+  });
+  take(us.flatrate, "sub");
+  take(us.rent, "rent");
+  take(us.buy, "buy");
+  return { genres: genres, hits: hits, miss: false, at: Date.now() };
+}
+function renderStream() {
+  if (!servicesReady) paintServices();
+  const items = streamSourceItems();
+  const checked = streamChecked();
+  const matchedItems = streamFilteredItems();
+  let rows = matchedItems.slice();
+  rows.sort((a, b) => {
+    const sort = ($("streamSort") && $("streamSort").value) || "az";
+    if (sort === "imdb") return (parseFloat(b.imdbRating) || 0) - (parseFloat(a.imdbRating) || 0);
+    if (sort === "you") return (parseFloat(b.yours) || 0) - (parseFloat(a.yours) || 0);
+    const c = String(a.title || "").localeCompare(String(b.title || ""));
+    return sort === "za" ? -c : c;
+  });
+  const shown = rows.slice(0, 80);
+  const box = $("streamOut");
+  if (!box) return;
+  if (!items.length) {
+    if (streamCatalog()) box.innerHTML = "<div style='color:#777'>" + escWatch(streamAnyNote || "Type a title, cast name, or year, or pick a genre or subgenre.") + "</div>";
+    else box.innerHTML = "<div style='color:#777'>That list is empty. Load a watchlist or ratings file first.</div>";
+    return;
+  }
+  box.innerHTML = shown.map(item => {
+    const rec = streamCache[streamKey(item)] || null;
+    const matched = checked.map(svc => ({ svc: svc, hits: rec ? serviceMatch(rec, svc) : [] })).filter(x => x.hits.length);
+    const where = !rec ? "" : (matched.length ? matched.map(x => x.svc.name + " · " + offerWord(x.hits)).join(", ") : "Not on selected services");
+    const extra = item.yours ? " · You " + escWatch(item.yours) : (item.imdbRating ? " · IMDb " + escWatch(item.imdbRating) : "");
+    const looked = rec ? "" : " <span class='sub'>not checked</span>";
+    const tags = genreTagHtml(streamGenreNames(item).join(", "));
+    return '<div class="stream-row"><b>' + escWatch(item.title) + '</b>'
+      + (item.year ? ' <span class="sub">(' + escWatch(item.year) + ')</span>' : '')
+      + (item.cast ? ' <span class="sub">· ' + escWatch(item.cast) + '</span>' : '')
+      + '<span class="sub">' + extra + '</span>' + looked
+      + (where ? '<div class="stream-hits"><b>' + escWatch(where) + '</b></div>' : '')
+      + (tags ? '<div class="stream-hits">' + tags + '</div>' : '')
+      + '</div>';
+  }).join("") || "<div style='color:#777'>Nothing matches.</div>";
+  const more = rows.length > shown.length ? '<div class="sub">Showing ' + shown.length + ' of ' + rows.length + '.</div>' : "";
+  if (more) box.insertAdjacentHTML("afterbegin", more);
+}
+async function runStreamCheck() {
+  const btn = $("streamCheck");
+  if (btn && btn.dataset.running === "1") { streamToken++; btn.dataset.running = ""; btn.textContent = "Check selected services"; return; }
+  const token = ++streamToken;
+  if (btn) { btn.dataset.running = "1"; btn.textContent = "Stop"; }
+  const status = $("streamStatus");
+  const items = streamFilteredItems();
+  if (!streamChecked().length) {
+    if (status) status.textContent = "Select a service first. Nothing was checked.";
+    if (btn) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
+    renderStream();
+    return;
+  }
+  if (!items.length) {
+    if (status) status.textContent = streamIsAny()
+      ? "Add a title, cast, year, genre, or subgenre first. Nothing was checked."
+      : "No titles match that genre, subgenre, or search. Nothing was checked.";
+    if (btn) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
+    renderStream();
+    return;
+  }
+  const fresh = 7 * 24 * 60 * 60 * 1000;
+  let done = 0;
+  let next = 0;
+  async function worker() {
+    while (token === streamToken) {
+      const i = next++;
+      if (i >= items.length) return;
+      const item = items[i];
+      const key = streamKey(item);
+      const rec = streamCache[key];
+      if (!(rec && rec.at && (Date.now() - rec.at) < fresh)) {
+        if (status) status.textContent = "Checking " + (i + 1) + " of " + items.length + " · " + item.title;
+        try {
+          const got = await fetchStream(item);
+          if (token !== streamToken) return;
+          streamCache[key] = got;
+          await idbPutOne("stream", key, got);
+        } catch (e) {
+          if (e && String(e.message || e) === "429") {
+            if (status) status.textContent = "Slowing down so the lookup is not blocked";
+            await new Promise(r => setTimeout(r, 1500));
+          } else if (status) status.textContent = "Lookup failed on " + item.title;
+        }
+      }
+      done++;
+      if (done % 4 === 0) renderStream();
+    }
+  }
+  await Promise.all([worker(), worker()]);
+  if (btn && token === streamToken) { btn.dataset.running = ""; btn.textContent = "Check selected services"; }
+  if (status && token === streamToken) status.textContent = "Checked " + done + " of " + items.length + ".";
+  renderStream();
+}
+let streamRenderTimer = 0;
+function queueRenderStream() {
+  clearTimeout(streamRenderTimer);
+  streamRenderTimer = setTimeout(renderStream, 80);
+}
+function syncStreamSearchHint() {
+  if ($("streamQ")) $("streamQ").placeholder = streamIsAny() ? "Title, cast, or year" : "Title, year, genre, director, date";
+}
+function clearStreamDisplay() {
+  const box = $("streamOut");
+  if (box) box.innerHTML = "";
+  const status = $("streamStatus");
+  if (status) status.textContent = "";
+  streamAny = [];
+  streamAnyNote = "";
+  streamSearched = false;
+  if (streamAnyCtrl) { try { streamAnyCtrl.abort(); } catch (e) {} streamAnyCtrl = null; }
+  clearTimeout(streamAnyTimer);
+  streamToken++;
+}
+let streamSearched = false;
+function wireStream() {
+  ["streamHomo","streamSort"].forEach(id => {
+    const el = $(id);
+    if (el) el.onchange = () => { if (streamSearched) renderStream(); };
+  });
+  ["streamGenre","streamSub"].forEach(id => {
+    const el = $(id);
+    if (el) el.onchange = () => { clearStreamDisplay(); };
+  });
+  if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); clearStreamDisplay(); };
+  if ($("streamQ")) $("streamQ").oninput = () => { /* wait for Check button */ };
+  if ($("streamCheck")) $("streamCheck").onclick = () => {
+    streamSearched = true;
+    if (streamIsAny() || streamGenreValue() || streamSubValue()) {
+      clearTimeout(streamAnyTimer);
+      loadStreamAny().then(() => runStreamCheck());
+    } else {
+      runStreamCheck();
+    }
+  };
+  loadStreamCache().then(() => { if (currentSection === "stream") clearStreamDisplay(); });
+}
+wireStream();
+
+
+function watchItem(x) {
+  if (x && typeof x === "object") return { title: x.title || "", imdbId: x.imdbId || "", year: x.year || "", type: x.type || "", imdbRating: x.imdbRating || "", genres: x.genres || "", director: x.director || "", runtime: x.runtime || "", released: x.released || "", date: x.date || "" };
+  return { title: String(x || ""), imdbId: "", year: "", type: "", imdbRating: "", genres: "", director: "", runtime: "", released: "", date: "" };
+}
+function watchTitle(item) {
+  return item && typeof item === "object" ? (item.title || "") : String(item || "");
+}
+function escWatch(s) {
+  return String(s || "").replace(/[&<>"]/g, function(c) {
+    if (c === "&") return "&" + "amp;";
+    if (c === "<") return "&" + "lt;";
+    if (c === ">") return "&" + "gt;";
+    return "&" + "quot;";
+  });
+}
+function indexWatchCsv(text) {
+  const lines = String(text || "").split(/\r?\n/).filter(l => l.trim());
+  if (!lines.length) return { items: [], skipped: 0, empty: true, hasIds: false };
+  const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+  const titleIdx = header.findIndex(h => h === "title" || h === "name" || h === "movie");
+  const idIdx = header.findIndex(h => h === "const" || h === "imdb id" || h === "tconst");
+  const yearIdx = header.findIndex(h => h === "year");
+  const typeIdx = header.findIndex(h => h === "title type");
+  const ratingIdx = header.findIndex(h => h === "imdb rating");
+  const genreIdx = header.findIndex(h => h === "genres" || h === "genre");
+  const dirIdx = header.findIndex(h => h === "directors" || h === "director");
+  const runIdx = header.findIndex(h => h === "runtime (mins)" || h === "runtime");
+  const relIdx = header.findIndex(h => h === "release date" || h === "released");
+  const isImdb = titleIdx >= 0 && idIdx >= 0;
+  const items = [];
+  let skipped = 0;
+  if (!isImdb) {
+    const start = titleIdx >= 0 ? 1 : 0;
+    for (let i = start; i < lines.length; i++) {
+      const cols = parseCsvLine(lines[i]);
+      const title = (titleIdx >= 0 ? (cols[titleIdx] || "") : (cols[0] || "")).trim();
+      if (title && title.toLowerCase() !== "title") items.push(watchItem({ title: title }));
+    }
+    return { items: items, skipped: 0, hasIds: false };
+  }
+  for (let i = 1; i < lines.length; i++) {
+    const cols = parseCsvLine(lines[i]);
+    const type = typeIdx >= 0 ? (cols[typeIdx] || "").trim() : "";
+    if (type && RATING_SKIP[type.toLowerCase()]) { skipped++; continue; }
+    const title = (cols[titleIdx] || "").trim();
+    if (!title) continue;
+    items.push({
+      title: title,
+      imdbId: (cols[idIdx] || "").trim(),
+      year: yearIdx >= 0 ? (cols[yearIdx] || "").trim() : "",
+      type: type,
+      imdbRating: ratingIdx >= 0 ? (cols[ratingIdx] || "").trim() : "",
+      genres: genreIdx >= 0 ? (cols[genreIdx] || "").trim() : "",
+      director: dirIdx >= 0 ? (cols[dirIdx] || "").trim() : "",
+      runtime: runIdx >= 0 ? (cols[runIdx] || "").trim() : "",
+      released: relIdx >= 0 ? (cols[relIdx] || "").trim() : ""
+    });
+  }
+  return { items: items, skipped: skipped, hasIds: true };
+}
+async function saveWatch() {
+  await idbPutMap("watch", { __list: myWatchlist });
+  localStorage.removeItem("md_my_watch");
+}
+async function loadWatchFromDb() {
+  try {
+    const raw = await idbGetAll("watch");
+    if (raw && Array.isArray(raw.__list)) {
+      myWatchlist = raw.__list.map(watchItem);
+      localStorage.removeItem("md_my_watch");
+    } else if (myWatchlist.length) {
+      await saveWatch();
+    }
+    if (currentSection === "watch") renderWatch();
+    if (currentSection === "inventory" && typeof render === "function") render();
+  } catch (e) {}
+}
+function watchOwnedSets() {
+  const titles = new Set();
+  const ids = new Set();
+  try {
+    getAll().forEach(m => {
+      if (m && m.title) titles.add(norm(m.title));
+      if (m && m.imdbId) ids.add(m.imdbId);
+    });
+  } catch (e) {}
+  return { titles: titles, ids: ids };
+}
+function watchRow(item, owned) {
+  const title = watchTitle(item);
+  const id = item && item.imdbId || "";
+  const year = item && item.year || "";
+  const rating = item && item.imdbRating || "";
+  const have = owned && ((id && owned.ids.has(id)) || owned.titles.has(norm(title)));
+  const tags = genreTagHtml(item && item.genres);
+  return '<div class="watch-row">' + escWatch(title)
+    + (year ? ' <span class="sub">(' + escWatch(year) + ')</span>' : '')
+    + (rating ? ' <span class="sub">IMDb ' + escWatch(rating) + '</span>' : '')
+    + (id ? ' <span class="sub">' + escWatch(id) + '</span>' : '')
+    + (have ? ' <span class="flag own">Owned</span>' : '')
+    + (tags ? ' ' + tags : '')
+    + '</div>';
+}
+function renderWatch() {
+  const box = $("sectionOut");
+  if (!box) return;
+  const personal = watchMode !== "friend";
+  const list = personal ? myWatchlist : friendWatchlist;
+  const label = personal ? "Personal Watchlist" : "Friend Watchlist";
+  const q = (($("watchQ") && $("watchQ").value) || "").trim().toLowerCase();
+  const filtered = q ? list.filter(item => {
+    const blob = [watchTitle(item), item && item.imdbId, item && item.year, item && item.genres, item && item.director, item && item.released].join(" ").toLowerCase();
+    return blob.indexOf(q) !== -1;
+  }) : list;
+  const cap = q ? 200 : 80;
+  const shown = filtered.slice(0, cap);
+  const owned = personal ? watchOwnedSets() : null;
+  const lines = shown.map(item => watchRow(item, owned)).join("") || "<div style='color:#777'>Empty.</div>";
+  const more = filtered.length > shown.length ? '<div class="sub">Showing ' + shown.length + ' of ' + filtered.length + '. Use the search box.</div>' : "";
+  box.innerHTML = '<b>' + label + '</b> (' + list.length + ')<br>' + more + lines;
+}
+function showSharedWatch() {
+  const mine = new Set(myWatchlist.map(t => normTitle(watchTitle(t))));
+  const shared = friendWatchlist.filter(t => mine.has(normTitle(watchTitle(t))));
+  const box = $("sectionOut");
+  const lines = shared.slice(0, 80).map(t => watchRow(t, null)).join("") || "<div style='color:#777'>No shared titles.</div>";
+  box.innerHTML = '<b>Shared Watchlist</b> (' + shared.length + ')<br>' + lines;
+}
+function loadMyWatch() {
+  const el = $("myWatch");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async () => {
+      const result = indexWatchCsv(reader.result || "");
+      if (result.empty) { showPopup("Empty file."); return; }
+      myWatchlist = result.items;
+      await saveWatch();
+      const idNote = result.hasIds ? " IMDb ids kept." : " No IMDb ids in that file.";
+      const skipNote = result.skipped ? " Skipped " + result.skipped + " episodes, games, and podcasts." : "";
+      showPopup("Watchlist: " + result.items.length + "." + idNote + skipNote);
+      render();
+      if (currentSection !== "watch") showSection("watch");
+      else renderWatch();
+    };
+    reader.readAsText(file);
+  };
+}
+
+function loadListFile(inputId, setter, storageKey) {
+  const el = $(inputId);
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const titles = parseFriendCsv(reader.result || "");
+      setter(titles);
+      localStorage.setItem(storageKey, JSON.stringify(titles));
+      showPopup("Loaded " + titles.length + " titles");
+      if (currentSection === "watch") renderWatch();
+      if (currentSection === "inventory") render();
+    };
+    reader.readAsText(file);
+  };
+}
+
+function loadRatingsFile() {
+  const el = $("friendRatings");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const text = reader.result || "";
+      const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const header = (lines[0] || "").split(/[,;\t]/).map(h => h.trim().toLowerCase());
+      const titleIdx = header.findIndex(h => h === "title" || h === "name");
+      const ratingIdx = header.findIndex(h => h.includes("rating") || h === "your rating");
+      const map = {};
+      const start = (titleIdx >= 0 || ratingIdx >= 0) ? 1 : 0;
+      for (let i = start; i < lines.length; i++) {
+        const cols = lines[i].split(/[,;\t]/);
+        const title = (cols[titleIdx >= 0 ? titleIdx : 0] || "").replace(/^["']|["']$/g, "").trim();
+        const rating = (cols[ratingIdx >= 0 ? ratingIdx : 1] || "").replace(/^["']|["']$/g, "").trim();
+        if (title) map[normTitle(title)] = rating;
+      }
+      friendRatings = map;
+      localStorage.setItem("md_friend_ratings", JSON.stringify(friendRatings));
+      showPopup("Friend ratings loaded: " + Object.keys(map).length);
+      if (currentSection === "inventory") render();
+      if (currentSection === "rated") showSection("rated");
+    };
+    reader.readAsText(file);
+  };
+}
+
+$("friendName").oninput = () => { localStorage.setItem("md_friend_name", $("friendName").value); if (currentSection === "inventory") render(); };
+$("friendName").value = localStorage.getItem("md_friend_name") || "";
+
+loadListFile("friendInv", arr => { friendInvTitles = arr; }, "md_friend_inv");
+loadRatingsFile();
+loadMyWatch();
+loadWatchFromDb();
+loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch");
+loadListFile("friendWatchData", arr => { friendWatchlist = arr; }, "md_friend_watch");
+
+$("tabInventory").onclick = () => showSection("inventory");
+$("tabAdd").onclick = () => showSection("add");
+$("tabSettings").onclick = () => showSection("settings");
+function renderBadgeSettings() {
+  const map = badgeFxMap();
+  const kinds = [["uhd","4K","Gold chrome","4K"],["blu","Blu-ray","Blue chrome","BLU"],["dvd","DVD","Silver chrome","DVD"]];
+  const fxs = [["polish","Polished","Still chrome"],["shimmer","Shimmer","Light sweeps across"],["glow","Glow","Soft pulse"]];
+  const box = $("badgeAppearance");
+  if (!box) return;
+  box.innerHTML = kinds.map(function(row) {
+    const k = row[0], name = row[1], metal = row[2], text = row[3];
+    const choices = fxs.map(function(fx) {
+      const on = map[k] === fx[0] ? " on" : "";
+      return '<button type="button" class="fx-pick' + on + '" data-kind="' + k + '" data-fx="' + fx[0] + '">'
+        + discBadge(k, (function(){ const o = {uhd:"polish",blu:"polish",dvd:"polish"}; o[k] = fx[0]; return o; })())
+        + '<span class="fx-name">' + fx[1] + '<br><span class="sub">' + fx[2] + '</span></span></button>';
+    }).join("");
+    return '<div class="fx-group"><div class="fx-head">' + name + ' <span class="sub">' + metal + '</span></div><div class="fx-choices">' + choices + '</div></div>';
+  }).join("");
+  box.querySelectorAll(".fx-pick").forEach(function(btn) {
+    btn.onclick = function() {
+      const m = badgeFxMap();
+      m[btn.dataset.kind] = btn.dataset.fx;
+      saveBadgeFx(m);
+      renderBadgeSettings();
+      render();
+    };
+  });
+}
+function showSettingsTab(which) {
+  const data = $("setData"), look = $("setLook");
+  if (data) data.style.display = which === "look" ? "none" : "block";
+  if (look) look.style.display = which === "look" ? "block" : "none";
+  if ($("setTabData")) $("setTabData").classList.toggle("active", which !== "look");
+  if ($("setTabLook")) $("setTabLook").classList.toggle("active", which === "look");
+  if (which === "look") renderBadgeSettings();
+}
+if ($("setTabData")) $("setTabData").onclick = () => showSettingsTab("data");
+if ($("setTabLook")) $("setTabLook").onclick = () => showSettingsTab("look");
+renderBadgeSettings();
+$("tabWatch").onclick = () => showSection("watch");
+$("tabStream").onclick = () => showSection("stream");
+let invRenderTimer = 0;
+$("q").oninput = () => { clearTimeout(invRenderTimer); invRenderTimer = setTimeout(render, 80); };
+(function initInventoryTools() {
+  const savedSort = localStorage.getItem("md_sort") || "added-new";
+  if ($("sortSel")) $("sortSel").value = savedSort;
+  let saved = {};
+  try { saved = JSON.parse(localStorage.getItem("md_filter") || "{}"); } catch (e) {}
+  if ($("filterDisc")) $("filterDisc").value = saved.disc || "";
+  if ($("filterBout")) $("filterBout").value = saved.bout || "";
+  if ($("filterHomo")) $("filterHomo").value = saved.homo || "";
+  if ($("filterGuide")) $("filterGuide").value = saved.guide || "";
+  function saveFilter() {
+    localStorage.setItem("md_filter", JSON.stringify({
+      disc: $("filterDisc").value,
+      bout: $("filterBout").value,
+      homo: $("filterHomo").value,
+      guide: $("filterGuide").value
+    }));
+    render();
+  }
+  $("filterBtn").onclick = () => $("filterPanel").classList.toggle("open");
+  $("sortSel").onchange = () => { localStorage.setItem("md_sort", $("sortSel").value); render(); };
+  $("filterDisc").onchange = saveFilter;
+  $("filterBout").onchange = saveFilter;
+  $("filterHomo").onchange = saveFilter;
+  $("filterGuide").onchange = saveFilter;
+  $("filterClear").onclick = () => {
+    $("filterDisc").value = "";
+    $("filterBout").value = "";
+    $("filterHomo").value = "";
+    $("filterGuide").value = "";
+    saveFilter();
+  };
+  render();
+})();
+$("watchModePersonal").onclick = () => { watchMode = "personal"; renderWatch(); };
+$("watchModeFriend").onclick = () => { watchMode = "friend"; renderWatch(); };
+$("watchShared").onclick = showSharedWatch;
+let watchRenderTimer = 0;
+if ($("watchQ")) $("watchQ").oninput = () => { watchMode = "personal"; clearTimeout(watchRenderTimer); watchRenderTimer = setTimeout(renderWatch, 80); };
+function normTitle(s){ return (s||"").toLowerCase().replace(/[^a-z0-9]/g,""); }
+function parseFriendCsv(text) {
+  const lines = text.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+  if (!lines.length) return [];
+  const header = lines[0].split(/[,;\t]/).map(h => h.trim().toLowerCase());
+  const titleIdx = header.findIndex(h => h === "title" || h === "name" || h === "movie");
+  const start = titleIdx >= 0 ? 1 : 0;
+  const titles = [];
+  for (let i = start; i < lines.length; i++) {
+    const cols = lines[i].split(/[,;\t]/);
+    const raw = titleIdx >= 0 ? (cols[titleIdx] || "") : cols[0];
+    const t = raw.replace(/^["']|["']$/g, "").trim();
+    if (t && t.toLowerCase() !== "title") titles.push(t);
+  }
+  return titles;
+}
+</script>
+
+<div class="modal" id="modal" style="display:none !important;" style="z-index:9999;" onclick="if(event.target===this)closeModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <p id="modalMsg" style="margin:0 0 16px;"></p>
+    <label style="display:block;margin:8px 0;"><input type="checkbox" id="modalDisable"> Disable</label>
+    <label style="display:block;margin:8px 0;"><input type="checkbox" id="modalSession"> Disable for this session</label>
+    <button id="modalOk" type="button" onclick="closeModal();return false;" style="float:none;display:block;width:100%;margin-top:12px;height:44px;font-size:1rem;background:#333;color:#fff;border:none;border-radius:8px;position:relative;z-index:10000;">Close</button>
+  </div>
+</div>
+
+
+<div id="coverPicker" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.75);z-index:99999;align-items:center;justify-content:center;"></div>
+
+</body>
+</html>
