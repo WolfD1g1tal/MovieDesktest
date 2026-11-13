@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.018</title>
+<title>Movie Desk 0.9.020</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.018</h1>
+  <h1>Movie Desk 0.9.020</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -505,7 +505,19 @@
     <label style="display:block;margin:6px 0">Source<br><input type="text" id="editSource" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">EAN / Barcode<br><input type="text" id="editEan" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">IMDb ID<br><input type="text" id="editImdbId" style="width:100%;height:36px"></label>
-    <label style="display:block;margin:6px 0">Disc Type<br><input type="text" id="editDiscType" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Disc Type<br>
+      <select id="editDiscType" style="width:100%;height:36px">
+        <option value="">Auto / Other</option>
+        <option value="uhd">4K Ultra HD</option>
+        <option value="blu">Blu-ray</option>
+        <option value="blu3d">Blu-ray 3D</option>
+        <option value="dvd">DVD</option>
+        <option value="laser">LaserDisc</option>
+        <option value="vhs">VHS</option>
+        <option value="hddvd">HD DVD</option>
+        <option value="digital">Digital</option>
+      </select>
+    </label>
     <label style="display:block;margin:6px 0">Audio Format<br><input type="text" id="editAudioFormat" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Audio Channels<br><input type="text" id="editAudioChannels" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Edition<br><input type="text" id="editEdition" style="width:100%;height:36px"></label>
@@ -953,13 +965,29 @@ function loadCollectionCsv() {
         }
         let cleanTitle = title;
         const tags = [];
-        const noteRe = /\s*\(([^)]+)\)/g;
+        // parentheses
+        const parenRe = /\s*\(([^)]+)\)/g;
         let m;
-        while ((m = noteRe.exec(title)) !== null) {
+        while ((m = parenRe.exec(title)) !== null) {
           const note = m[1].trim();
           if (note && !/^(19|20)\d{2}$/.test(note)) tags.push(note);
         }
-        cleanTitle = title.replace(/\s*\([^)]+\)/g, "").trim();
+        // brackets
+        const brackRe = /\s*\[([^\]]+)\]/g;
+        while ((m = brackRe.exec(title)) !== null) {
+          const note = m[1].trim();
+          if (note) tags.push(note);
+        }
+        // +W/ or + notes
+        const plusRe = /\s*\+[^\s]+/g;
+        while ((m = plusRe.exec(title)) !== null) {
+          tags.push(m[0].trim());
+        }
+        cleanTitle = title
+          .replace(/\s*\([^)]+\)/g, "")
+          .replace(/\s*\[[^\]]+\]/g, "")
+          .replace(/\s*\+[^\s]+/g, "")
+          .trim();
         const imdbId = iIdx >= 0 ? (cols[iIdx] || "").trim() : "";
         let publicRating = "";
         if (imdbId && myRatingsById[imdbId] && myRatingsById[imdbId].rating) {
@@ -977,7 +1005,13 @@ function loadCollectionCsv() {
           edition: eIdx >= 0 ? (cols[eIdx] || "").trim() : "",
           imdbId: imdbId,
           tmdbId: tmIdx >= 0 ? (cols[tmIdx] || "").trim() : "",
-          genres: gIdx >= 0 ? (cols[gIdx] || "").trim() : "",
+          genres: (function() {
+            const raw = gIdx >= 0 ? (cols[gIdx] || "").trim() : "";
+            if (!raw) return "";
+            const GENRE_MAP = {28:"Action",12:"Adventure",16:"Animation",35:"Comedy",80:"Crime",99:"Documentary",18:"Drama",10751:"Family",14:"Fantasy",36:"History",27:"Horror",10402:"Music",9648:"Mystery",10749:"Romance",878:"Sci-Fi",53:"Thriller",10752:"War",37:"Western"};
+            const ids = raw.replace(/[\[\]]/g, "").split(/[,\s]+/).filter(Boolean);
+            return ids.map(id => GENRE_MAP[id] || id).filter(Boolean).join(", ");
+          })(),
           format: format,
           coverUrl: cIdx >= 0 ? (cols[cIdx] || "").trim() : "",
           publicRating: publicRating,
@@ -1916,7 +1950,7 @@ function badgeFxMap() {
 }
 function saveBadgeFx(map) { localStorage.setItem("md_badge_fx", JSON.stringify(map)); }
 function discBadge(bucket, fxMap) {
-  if (bucket !== "uhd" && bucket !== "blu" && bucket !== "dvd") return "";
+  if (!["uhd","blu","blu3d","dvd","laser","vhs","hddvd","digital"].includes(bucket)) return "";
   const fx = (fxMap && fxMap[bucket]) || "polish";
   const safeFx = (fx === "shimmer" || fx === "glow") ? fx : "polish";
   const gid = "gb" + Math.random().toString(36).slice(2, 8);
@@ -1972,14 +2006,64 @@ function discBadge(bucket, fxMap) {
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#2c3136" letter-spacing="1">VIDEO</text>'
       + '</svg></span>';
   }
+  if (bucket === "blu3d") {
+    return '<span class="disc-badge kind-blu fx-' + safeFx + '" title="Blu-ray 3D" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="#0b3a6c" stroke="#8ec4f2" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="36" text-anchor="middle" font-family="system-ui,sans-serif" font-size="18" font-weight="900" fill="#8ec4f2">BLU</text>'
+      + '<text x="60" y="56" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="700" fill="#f7fbff">3D</text>'
+      + '</svg></span>';
+  }
+  if (bucket === "laser") {
+    return '<span class="disc-badge" title="LaserDisc" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="#4a2c0a" stroke="#d4a017" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="900" fill="#d4a017">LD</text>'
+      + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="7" font-weight="700" fill="#d4a017">LASER</text>'
+      + '</svg></span>';
+  }
+  if (bucket === "vhs") {
+    return '<span class="disc-badge" title="VHS" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="#1a1a1a" stroke="#888" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#111"/>'
+      + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="20" font-weight="900" fill="#ccc">VHS</text>'
+      + '</svg></span>';
+  }
+  if (bucket === "hddvd") {
+    return '<span class="disc-badge" title="HD DVD" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="#2a1a4a" stroke="#a080d0" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="40" text-anchor="middle" font-family="system-ui,sans-serif" font-size="16" font-weight="900" fill="#a080d0">HD</text>'
+      + '<text x="60" y="58" text-anchor="middle" font-family="system-ui,sans-serif" font-size="10" font-weight="700" fill="#c0a0e0">DVD</text>'
+      + '</svg></span>';
+  }
+  if (bucket === "digital") {
+    return '<span class="disc-badge" title="Digital" style="height:32px;min-width:56px;padding:0;background:none;box-shadow:none;">'
+      + '<svg viewBox="0 0 120 80" width="56" height="32" xmlns="http://www.w3.org/2000/svg" style="display:block;">'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="#0a2a1a" stroke="#4ade80" stroke-width="1"/>'
+      + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
+      + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="14" font-weight="900" fill="#4ade80">DIG</text>'
+      + '</svg></span>';
+  }
   return "";
 }
 function discBucket(m) {
+  const explicit = (m.discType || "").toLowerCase().trim();
+  if (["uhd","blu","blu3d","dvd","laser","vhs","hddvd","digital"].includes(explicit)) return explicit;
   const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
   const t = (m.title || "").toLowerCase();
   if (/ultra|\buhd\b|\b4k\b/.test(d) || /\b4k\b|\buhd\b|ultra hd/.test(t)) return "uhd";
+  if (/3d/.test(d) && /blu/.test(d)) return "blu3d";
   if (/blu/.test(d)) return "blu";
+  if (/laser/.test(d)) return "laser";
+  if (/vhs/.test(d)) return "vhs";
+  if (/hd.?dvd/.test(d)) return "hddvd";
   if (/\bdvd\b/.test(d)) return "dvd";
+  if (/digital/.test(d)) return "digital";
   return "other";
 }
 function numRating(v) {
