@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.014</title>
+<title>Movie Desk 0.9.016</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.014</h1>
+  <h1>Movie Desk 0.9.016</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -897,6 +897,51 @@ function loadBoutiqueCsv() {
   };
 }
 loadBoutiqueCsv();
+function loadCollectionCsv() {
+  const el = $("fcol");
+  if (!el) return;
+  el.onchange = e => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const lines = (reader.result || "").split(/\r?\n/).filter(l => l.trim());
+      if (!lines.length) { showPopup("Empty file."); return; }
+      const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      const idx = name => header.findIndex(h => h === name || h.replace(/[^a-z]/g, "") === name.replace(/[^a-z]/g, ""));
+      const tIdx = ["title","name","movie"].map(idx).find(i => i >= 0);
+      const bIdx = ["barcode","upc","ean","gtin"].map(idx).find(i => i >= 0);
+      const yIdx = ["year","releaseyear","released"].map(idx).find(i => i >= 0);
+      const eIdx = ["edition","format","disc","disctype"].map(idx).find(i => i >= 0);
+      const iIdx = ["imdbid","imdb","tt"].map(idx).find(i => i >= 0);
+      const gIdx = ["genres","genre"].map(idx).find(i => i >= 0);
+      if (tIdx == null || tIdx < 0) { showPopup("Need a title column."); return; }
+      const items = [];
+      for (let i = 1; i < lines.length; i++) {
+        const cols = parseCsvLine(lines[i]);
+        const title = (cols[tIdx] || "").trim();
+        if (!title) continue;
+        const id = "c" + Date.now() + "_" + i;
+        items.push({
+          id: id,
+          title: title,
+          year: yIdx >= 0 ? (cols[yIdx] || "").trim() : "",
+          barcode: bIdx >= 0 ? (cols[bIdx] || "").replace(/\D/g, "") : "",
+          edition: eIdx >= 0 ? (cols[eIdx] || "").trim() : "",
+          imdbId: iIdx >= 0 ? (cols[iIdx] || "").trim() : "",
+          genres: gIdx >= 0 ? (cols[gIdx] || "").trim() : "",
+          format: eIdx >= 0 ? (cols[eIdx] || "").trim().toLowerCase() : ""
+        });
+      }
+      collection = items;
+      saveColl();
+      showPopup("Loaded " + items.length + " titles from collection.");
+      render();
+    };
+    reader.readAsText(file);
+  };
+}
+loadCollectionCsv();
 let scanning = false;
 let stream = null;
 let scanTarget = null; // "mother" or "child"
@@ -2433,6 +2478,9 @@ const STREAM_SERVICES = [
   { id: 99, name: "Shudder", group: "other", kind: "sub" },
   { id: 2616, name: "Paramount+ Essential", group: "other", kind: "sub" },
   { id: 1794, name: "Starz on Prime", group: "other", kind: "sub" },
+  { id: 526, name: "AMC+ on Prime", group: "yours", kind: "sub" },
+  { id: 151, name: "BritBox on Prime", group: "yours", kind: "sub" },
+  { id: 258, name: "Criterion on Prime", group: "yours", kind: "sub" },
   { id: 10, name: "Amazon Video", group: "shop", kind: "shop" },
   { id: 2, name: "Apple TV Store", group: "shop", kind: "shop" },
   { id: 3, name: "Google Play Movies", group: "shop", kind: "shop" },
@@ -2861,40 +2909,95 @@ async function loadStreamCache() {
   try { streamCache = await idbGetAll("stream") || {}; }
   catch (e) { streamCache = {}; }
 }
+const WATCHMODE_KEY = localStorage.getItem("md_watchmode_key") || "";
+const STREAMAVAIL_KEY = localStorage.getItem("md_streamavail_key") || "";
+const ATTRIBUTIONS = {
+  watchmode: "Data from Watchmode",
+  tmdb: "Powered by JustWatch",
+  streamavail: "Streaming Availability API"
+};
 async function fetchStream(item) {
+  const sources = [];
+  let genres = [];
+  let hits = [];
+  // TMDB path (always available)
   let kind = "movie";
   let id = null;
   if (item.tmdbId) { id = item.tmdbId; kind = item.tmdbKind === "tv" ? "tv" : "movie"; }
   else if (item.imdbId) {
-    const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(item.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
-    if (res.status === 429) throw new Error("429");
-    const d = await res.json();
-    if (d.movie_results && d.movie_results[0]) { kind = "movie"; id = d.movie_results[0].id; }
-    else if (d.tv_results && d.tv_results[0]) { kind = "tv"; id = d.tv_results[0].id; }
+    try {
+      const res = await fetch("https://api.themoviedb.org/3/find/" + encodeURIComponent(item.imdbId) + "?external_source=imdb_id&api_key=" + TMDB_KEY);
+      if (res.status === 429) throw new Error("429");
+      const d = await res.json();
+      if (d.movie_results && d.movie_results[0]) { kind = "movie"; id = d.movie_results[0].id; }
+      else if (d.tv_results && d.tv_results[0]) { kind = "tv"; id = d.tv_results[0].id; }
+    } catch (e) { if (String(e.message) === "429") throw e; }
   }
   if (!id && item.title) {
-    let url = "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(item.title) + "&api_key=" + TMDB_KEY;
-    const y = String(item.year || "").match(/(19|20)\d{2}/);
-    if (y) url += "&year=" + y[0];
-    const res = await fetch(url);
-    const d = await res.json();
-    if (d.results && d.results[0]) { id = d.results[0].id; kind = "movie"; }
+    try {
+      let url = "https://api.themoviedb.org/3/search/movie?query=" + encodeURIComponent(item.title) + "&api_key=" + TMDB_KEY;
+      const y = String(item.year || "").match(/(19|20)\d{2}/);
+      if (y) url += "&year=" + y[0];
+      const res = await fetch(url);
+      const d = await res.json();
+      if (d.results && d.results[0]) { id = d.results[0].id; kind = "movie"; }
+    } catch (e) {}
   }
-  if (!id) return { genres: [], hits: [], miss: true, at: Date.now() };
-  const res = await fetch("https://api.themoviedb.org/3/" + kind + "/" + id + "?append_to_response=watch/providers&api_key=" + TMDB_KEY);
-  if (res.status === 429) throw new Error("429");
-  const d = await res.json();
-  const genres = (d.genres || []).map(g => g.name).filter(Boolean);
-  const us = (d["watch/providers"] && d["watch/providers"].results && d["watch/providers"].results.US) || {};
-  const hits = [];
-  const take = (arr, offer) => (arr || []).forEach(p => {
-    if (!p || STREAM_SERVICES.every(s => s.id !== p.provider_id)) return;
-    hits.push({ id: p.provider_id, name: p.provider_name || "", offer: offer });
+  if (id) {
+    try {
+      const res = await fetch("https://api.themoviedb.org/3/" + kind + "/" + id + "?append_to_response=watch/providers&api_key=" + TMDB_KEY);
+      if (res.status === 429) throw new Error("429");
+      const d = await res.json();
+      genres = (d.genres || []).map(g => g.name).filter(Boolean);
+      const us = (d["watch/providers"] && d["watch/providers"].results && d["watch/providers"].results.US) || {};
+      const take = (arr, offer) => (arr || []).forEach(p => {
+        if (!p || STREAM_SERVICES.every(s => s.id !== p.provider_id)) return;
+        hits.push({ id: p.provider_id, name: p.provider_name || "", offer: offer, source: "tmdb" });
+      });
+      take(us.flatrate, "sub");
+      take(us.rent, "rent");
+      take(us.buy, "buy");
+      if (hits.length) sources.push("tmdb");
+    } catch (e) { if (String(e.message) === "429") throw e; }
+  }
+  // Watchmode (if key present)
+  if (WATCHMODE_KEY && item.imdbId) {
+    try {
+      const res = await fetch("https://api.watchmode.com/v1/title/" + encodeURIComponent(item.imdbId) + "/sources/?apiKey=" + WATCHMODE_KEY + "&regions=US");
+      if (res.ok) {
+        const d = await res.json();
+        (d || []).forEach(src => {
+          const svc = STREAM_SERVICES.find(s => (s.name || "").toLowerCase().includes((src.name || "").toLowerCase().slice(0, 6)));
+          if (svc) hits.push({ id: svc.id, name: src.name || svc.name, offer: src.type === "sub" ? "sub" : (src.type === "rent" ? "rent" : "buy"), source: "watchmode" });
+        });
+        if (d && d.length) sources.push("watchmode");
+      }
+    } catch (e) {}
+  }
+  // Streaming Availability API (if key present)
+  if (STREAMAVAIL_KEY && item.imdbId) {
+    try {
+      const res = await fetch("https://streaming-availability.p.rapidapi.com/get/basic?imdb_id=" + encodeURIComponent(item.imdbId) + "&country=us", {
+        headers: { "X-RapidAPI-Key": STREAMAVAIL_KEY, "X-RapidAPI-Host": "streaming-availability.p.rapidapi.com" }
+      });
+      if (res.ok) {
+        const d = await res.json();
+        const offers = (d.streamingInfo && d.streamingInfo.us) || [];
+        offers.forEach(o => {
+          const svc = STREAM_SERVICES.find(s => (s.name || "").toLowerCase().includes((o.service || "").toLowerCase().slice(0, 6)));
+          if (svc) hits.push({ id: svc.id, name: o.service || svc.name, offer: o.streamingType === "subscription" ? "sub" : (o.streamingType === "rent" ? "rent" : "buy"), source: "streamavail" });
+        });
+        if (offers.length) sources.push("streamavail");
+      }
+    } catch (e) {}
+  }
+  const uniqueHits = [];
+  const seen = new Set();
+  hits.forEach(h => {
+    const k = h.id + ":" + h.offer;
+    if (!seen.has(k)) { seen.add(k); uniqueHits.push(h); }
   });
-  take(us.flatrate, "sub");
-  take(us.rent, "rent");
-  take(us.buy, "buy");
-  return { genres: genres, hits: hits, miss: false, at: Date.now() };
+  return { genres: genres, hits: uniqueHits, miss: !uniqueHits.length && !id, at: Date.now(), sources: sources };
 }
 function renderStream() {
   if (!servicesReady) paintServices();
@@ -2932,8 +3035,15 @@ function renderStream() {
       + (tags ? '<div class="stream-hits">' + tags + '</div>' : '')
       + '</div>';
   }).join("") || "<div style='color:#777'>Nothing matches.</div>";
-  const more = rows.length > shown.length ? '<div class="sub">Showing ' + shown.length + ' of ' + rows.length + '.</div>' : "";
-  if (more) box.insertAdjacentHTML("afterbegin", more);
+  const moreCount = rows.length - shown.length;
+  const attrSet = new Set();
+  shown.forEach(item => { const rec = streamCache[streamKey(item)]; if (rec && rec.sources) rec.sources.forEach(s => attrSet.add(s)); });
+  const attrHtml = attrSet.size ? '<div class="sub" style="margin-top:10px;font-size:0.75rem">' + Array.from(attrSet).map(s => ATTRIBUTIONS[s] || s).join(" · ") + '</div>' : "";
+  const moreBtn = moreCount > 0 ? '<button type="button" id="streamMore" style="margin-top:8px;width:100%;height:36px">More (' + moreCount + ' remaining)</button>' : "";
+  if (moreBtn) box.insertAdjacentHTML("beforeend", moreBtn);
+  if (attrHtml) box.insertAdjacentHTML("beforeend", attrHtml);
+  const moreEl = $("streamMore");
+  if (moreEl) moreEl.onclick = () => { const all = rows; box.innerHTML = all.map(item => { const rec = streamCache[streamKey(item)] || null; const matched = checked.map(svc => ({ svc: svc, hits: rec ? serviceMatch(rec, svc) : [] })).filter(x => x.hits.length); const where = !rec ? "" : (matched.length ? matched.map(x => x.svc.name + " · " + offerWord(x.hits)).join(", ") : "Not on selected services"); const extra = item.yours ? " · You " + escWatch(item.yours) : (item.imdbRating ? " · IMDb " + escWatch(item.imdbRating) : ""); const looked = rec ? "" : " <span class='sub'>not checked</span>"; const tags = genreTagHtml(streamGenreNames(item).join(", ")); return '<div class="stream-row"><b>' + escWatch(item.title) + '</b>' + (item.year ? ' <span class="sub">(' + escWatch(item.year) + ')</span>' : '') + (item.cast ? ' <span class="sub">· ' + escWatch(item.cast) + '</span>' : '') + '<span class="sub">' + extra + '</span>' + looked + (where ? '<div class="stream-hits"><b>' + escWatch(where) + '</b></div>' : '') + (tags ? '<div class="stream-hits">' + tags + '</div>' : '') + '</div>'; }).join("") + attrHtml; };
 }
 async function runStreamCheck() {
   const btn = $("streamCheck");
