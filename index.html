@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.017</title>
+<title>Movie Desk 0.9.018</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.017</h1>
+  <h1>Movie Desk 0.9.018</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -951,17 +951,38 @@ function loadCollectionCsv() {
           else if (dt === "1" || /dvd/i.test(dt)) format = "dvd";
           else format = dt.toLowerCase();
         }
+        let cleanTitle = title;
+        const tags = [];
+        const noteRe = /\s*\(([^)]+)\)/g;
+        let m;
+        while ((m = noteRe.exec(title)) !== null) {
+          const note = m[1].trim();
+          if (note && !/^(19|20)\d{2}$/.test(note)) tags.push(note);
+        }
+        cleanTitle = title.replace(/\s*\([^)]+\)/g, "").trim();
+        const imdbId = iIdx >= 0 ? (cols[iIdx] || "").trim() : "";
+        let publicRating = "";
+        if (imdbId && myRatingsById[imdbId] && myRatingsById[imdbId].rating) {
+          publicRating = String(myRatingsById[imdbId].rating);
+        } else if (cleanTitle && myRatings[norm(cleanTitle)]) {
+          const list = myRatings[norm(cleanTitle)] || [];
+          const hit = list.find(r => r && r.rating) || list[0];
+          if (hit && hit.rating) publicRating = String(hit.rating);
+        }
         items.push({
           id: id,
-          title: title,
+          title: cleanTitle,
           year: year,
           barcode: bIdx >= 0 ? (cols[bIdx] || "").replace(/\D/g, "") : "",
           edition: eIdx >= 0 ? (cols[eIdx] || "").trim() : "",
-          imdbId: iIdx >= 0 ? (cols[iIdx] || "").trim() : "",
+          imdbId: imdbId,
           tmdbId: tmIdx >= 0 ? (cols[tmIdx] || "").trim() : "",
           genres: gIdx >= 0 ? (cols[gIdx] || "").trim() : "",
           format: format,
-          coverUrl: cIdx >= 0 ? (cols[cIdx] || "").trim() : ""
+          coverUrl: cIdx >= 0 ? (cols[cIdx] || "").trim() : "",
+          publicRating: publicRating,
+          notes: tags.join(", "),
+          tags: tags
         });
       }
       collection = items;
