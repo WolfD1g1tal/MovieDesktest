@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.016</title>
+<title>Movie Desk 0.9.017</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.016</h1>
+  <h1>Movie Desk 0.9.017</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -905,38 +905,69 @@ function loadCollectionCsv() {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      const lines = (reader.result || "").split(/\r?\n/).filter(l => l.trim());
+      let raw = reader.result || "";
+      const lines = raw.split(/\r?\n/).filter(l => l.trim());
       if (!lines.length) { showPopup("Empty file."); return; }
-      const header = parseCsvLine(lines[0]).map(h => h.trim().toLowerCase());
+      const delim = (lines[0].split(";").length > lines[0].split(",").length) ? ";" : ",";
+      function splitLine(line) {
+        const out = [];
+        let cur = "", inQ = false;
+        for (let i = 0; i < line.length; i++) {
+          const c = line[i];
+          if (c === '"') { inQ = !inQ; continue; }
+          if (c === delim && !inQ) { out.push(cur); cur = ""; continue; }
+          cur += c;
+        }
+        out.push(cur);
+        return out;
+      }
+      const header = splitLine(lines[0]).map(h => h.trim().toLowerCase());
       const idx = name => header.findIndex(h => h === name || h.replace(/[^a-z]/g, "") === name.replace(/[^a-z]/g, ""));
       const tIdx = ["title","name","movie"].map(idx).find(i => i >= 0);
-      const bIdx = ["barcode","upc","ean","gtin"].map(idx).find(i => i >= 0);
-      const yIdx = ["year","releaseyear","released"].map(idx).find(i => i >= 0);
-      const eIdx = ["edition","format","disc","disctype"].map(idx).find(i => i >= 0);
-      const iIdx = ["imdbid","imdb","tt"].map(idx).find(i => i >= 0);
-      const gIdx = ["genres","genre"].map(idx).find(i => i >= 0);
+      const bIdx = ["ean","barcode","upc","gtin"].map(idx).find(i => i >= 0);
+      const yIdx = ["releasedate","year","releaseyear"].map(idx).find(i => i >= 0);
+      const eIdx = ["disctype","edition","format"].map(idx).find(i => i >= 0);
+      const iIdx = ["imdbid","imdb"].map(idx).find(i => i >= 0);
+      const tmIdx = ["tmdbid"].map(idx).find(i => i >= 0);
+      const gIdx = ["genreids","genres","genre"].map(idx).find(i => i >= 0);
+      const cIdx = ["coverlink","cover","coverurl"].map(idx).find(i => i >= 0);
       if (tIdx == null || tIdx < 0) { showPopup("Need a title column."); return; }
       const items = [];
       for (let i = 1; i < lines.length; i++) {
-        const cols = parseCsvLine(lines[i]);
+        const cols = splitLine(lines[i]);
         const title = (cols[tIdx] || "").trim();
         if (!title) continue;
         const id = "c" + Date.now() + "_" + i;
+        let year = "";
+        if (yIdx >= 0 && cols[yIdx]) {
+          const m = String(cols[yIdx]).match(/(19|20)\d{2}/);
+          if (m) year = m[0];
+        }
+        let format = "";
+        if (eIdx >= 0 && cols[eIdx]) {
+          const dt = String(cols[eIdx]).trim();
+          if (dt === "5" || /uhd|4k/i.test(dt)) format = "uhd";
+          else if (dt === "3" || /blu/i.test(dt)) format = "blu";
+          else if (dt === "1" || /dvd/i.test(dt)) format = "dvd";
+          else format = dt.toLowerCase();
+        }
         items.push({
           id: id,
           title: title,
-          year: yIdx >= 0 ? (cols[yIdx] || "").trim() : "",
+          year: year,
           barcode: bIdx >= 0 ? (cols[bIdx] || "").replace(/\D/g, "") : "",
           edition: eIdx >= 0 ? (cols[eIdx] || "").trim() : "",
           imdbId: iIdx >= 0 ? (cols[iIdx] || "").trim() : "",
+          tmdbId: tmIdx >= 0 ? (cols[tmIdx] || "").trim() : "",
           genres: gIdx >= 0 ? (cols[gIdx] || "").trim() : "",
-          format: eIdx >= 0 ? (cols[eIdx] || "").trim().toLowerCase() : ""
+          format: format,
+          coverUrl: cIdx >= 0 ? (cols[cIdx] || "").trim() : ""
         });
       }
       collection = items;
       saveColl();
       showPopup("Loaded " + items.length + " titles from collection.");
-      render();
+      if (typeof render === "function") render();
     };
     reader.readAsText(file);
   };
