@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.024</title>
+<title>Movie Desk 0.9.025</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.024</h1>
+  <h1>Movie Desk 0.9.025</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2597,7 +2597,7 @@ function showSettings() {
 }
 function showSection(name) {
   currentSection = name;
-  ["inventory","add","watch","stream","settings"].forEach(s => {
+  ["inventory","add","watch","stream","settings","anime"].forEach(s => {
     const sec = $("sec" + s.charAt(0).toUpperCase() + s.slice(1));
     const btn = $("tab" + s.charAt(0).toUpperCase() + s.slice(1));
     if (sec) sec.classList.toggle("active", s === name);
@@ -2607,6 +2607,7 @@ function showSection(name) {
   if (name === "watch") renderWatch();
   if (name === "stream") clearStreamDisplay();
   if (name === "settings") showSettings();
+  if (name === "anime") animeRender();
 }
 
 const STREAM_SERVICES = [
