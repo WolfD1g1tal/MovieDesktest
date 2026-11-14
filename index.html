@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.020</title>
+<title>Movie Desk 0.9.024</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -21,7 +21,7 @@
   .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
   #scanner { display: none; margin: 12px 0; }
   #scanner video { width: 100%; border-radius: 12px; background: #000; }
-  .card { background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; content-visibility: auto; contain-intrinsic-size: auto 204px; }
+  .card { display:flex;  background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; content-visibility: auto; contain-intrinsic-size: auto 204px; }
   .card-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 6px; background: #222; flex-shrink: 0; }
   .card-body { flex: 1; min-width: 0; }
   .card-title { font-weight: 500; font-size: 1.05rem; margin: 0 0 2px; cursor: pointer; }
@@ -98,18 +98,33 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.020</h1>
+  <h1>Movie Desk 0.9.024</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
   <div class="nav">
     <button id="tabInventory" class="active">Inventory</button>
+    <button id="tabAnime">Anime</button>
     <button id="tabAdd">Add</button>
     <button id="tabWatch">Watchlist</button>
     <button id="tabStream">Stream</button>
     <button id="tabSettings">Settings</button>
   </div>
 
+  <div id="secAnime" class="section">
+    <div class="section-label">Anime Central</div>
+    <div class="sub">Manga and figures linked to titles. Themes: Default, My Hero Academia, Frieren.</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+      <select id="animeTheme" onchange="animeSetTheme(this.value)">
+        <option value="default">Default Dark</option>
+        <option value="mha">My Hero Academia</option>
+        <option value="frieren">Frieren</option>
+      </select>
+      <input type="text" id="animeSearch" placeholder="Search anime..." oninput="animeRender()">
+      <button onclick="animeOpenAdd()">+ Add Anime Title</button>
+    </div>
+    <div id="animeGrid" class="grid"></div>
+  </div>
   <div id="secInventory" class="section active">
     <input type="search" id="q" placeholder="Search your titles...">
     <div class="tool-row">
@@ -1013,10 +1028,12 @@ function loadCollectionCsv() {
             return ids.map(id => GENRE_MAP[id] || id).filter(Boolean).join(", ");
           })(),
           format: format,
+          discType: format || (eIdx >= 0 ? (cols[eIdx] || "").trim() : ""),
           coverUrl: cIdx >= 0 ? (cols[cIdx] || "").trim() : "",
           publicRating: publicRating,
           notes: tags.join(", "),
-          tags: tags
+          tags: tags,
+          ratingStatus: publicRating ? "ok" : (imdbId ? "no-match" : "no-id")
         });
       }
       collection = items;
@@ -2052,7 +2069,7 @@ function discBadge(bucket, fxMap) {
   return "";
 }
 function discBucket(m) {
-  const explicit = (m.discType || "").toLowerCase().trim();
+  const explicit = ((m.discType || m.format || "")).toLowerCase().trim();
   if (["uhd","blu","blu3d","dvd","laser","vhs","hddvd","digital"].includes(explicit)) return explicit;
   const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
   const t = (m.title || "").toLowerCase();
@@ -2234,7 +2251,7 @@ function render() {
           ${pkgNote}
           ${boutNote}
           <span class="flag ${guideFlags[key]?"guide-yes":"guide-no"}" data-guide="${key}">Guide: ${guideFlags[key]?"yes":"no"}</span>
-          <span class="flag imdb">IMDb: ${m.publicRating||"-"}</span>
+          <span class="flag imdb" title="${m.ratingStatus === "no-id" ? "No IMDb ID in collection" : (m.ratingStatus === "no-match" ? "No matching rating found" : "")}">IMDb: ${m.publicRating||"-"}</span>
           ${ratingBadge(m)}
         </div>
         ${ssOnCard() ? `<div class="card-ss" style="margin-top:6px;"><span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">ss: ${isYes?"yes":"no"}</span></div>` : ""}
@@ -3187,6 +3204,9 @@ async function runStreamCheck() {
   const token = ++streamToken;
   if (btn) { btn.dataset.running = "1"; btn.textContent = "Stop"; }
   const status = $("streamStatus");
+  if (streamIsAny() || (($("streamQ") && $("streamQ").value) || "").trim()) {
+    await new Promise(r => { queueStreamAny(); setTimeout(r, 400); });
+  }
   const items = streamFilteredItems();
   if (!streamChecked().length) {
     if (status) status.textContent = "Select a service first. Nothing was checked.";
@@ -3266,7 +3286,10 @@ function wireStream() {
     if (el) el.onchange = () => { clearStreamDisplay(); };
   });
   if ($("streamSource")) $("streamSource").onchange = () => { syncStreamSearchHint(); clearStreamDisplay(); };
-  if ($("streamQ")) $("streamQ").oninput = () => { /* wait for Check button */ };
+  if ($("streamQ")) $("streamQ").oninput = () => {
+    clearStreamDisplay();
+    queueStreamAny();
+  };
   if ($("streamCheck")) $("streamCheck").onclick = () => {
     streamSearched = true;
     if (streamIsAny() || streamGenreValue() || streamSubValue()) {
@@ -3493,6 +3516,7 @@ loadListFile("friendWatch", arr => { friendWatchlist = arr; }, "md_friend_watch"
 loadListFile("friendWatchData", arr => { friendWatchlist = arr; }, "md_friend_watch");
 
 $("tabInventory").onclick = () => showSection("inventory");
+$("tabAnime").onclick = () => showSection("anime");
 $("tabAdd").onclick = () => showSection("add");
 $("tabSettings").onclick = () => showSection("settings");
 function renderBadgeSettings() {
@@ -3590,6 +3614,48 @@ function parseFriendCsv(text) {
   }
   return titles;
 }
+
+// --- Anime Central ---
+const ANIME_KEY = "animeCentralData_v1";
+let animeInv = JSON.parse(localStorage.getItem(ANIME_KEY) || "[]");
+let animeCurrent = null;
+function animeSave(){ localStorage.setItem(ANIME_KEY, JSON.stringify(animeInv)); }
+function animeSetTheme(t){
+  document.body.classList.remove("theme-mha","theme-frieren");
+  if (t === "mha") document.body.classList.add("theme-mha");
+  if (t === "frieren") document.body.classList.add("theme-frieren");
+}
+function animeRender(){
+  const q = ($("animeSearch") && $("animeSearch").value || "").toLowerCase();
+  const list = animeInv.filter(i => (i.title||"").toLowerCase().includes(q));
+  const grid = $("animeGrid");
+  if (!grid) return;
+  if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
+  grid.innerHTML = list.map(item => `
+    <div class="card" onclick="animeOpenDetail('${item.id}')">
+      <div class="cover" style="${item.cover ? 'background-image:url('+JSON.stringify(item.cover)+')' : ''}"></div>
+      <div class="card-body">
+        <div class="card-title">${escWatch(item.title)}</div>
+        <div class="card-meta">${item.year||""} · ${item.format||""}</div>
+        <div class="badges">
+          ${(item.manga||[]).length ? '<span class="badge manga">Manga '+item.manga.length+'</span>' : ''}
+          ${(item.figures||[]).length ? '<span class="badge figure">Figures '+item.figures.length+'</span>' : ''}
+        </div>
+      </div>
+    </div>`).join("");
+}
+function animeOpenAdd(){
+  const title = prompt("Anime title");
+  if (!title) return;
+  animeInv.push({ id: Date.now(), title, year:"", format:"Blu-ray", manga:[], figures:[], added:new Date().toISOString() });
+  animeSave(); animeRender();
+}
+function animeOpenDetail(id){
+  const item = animeInv.find(i => i.id == id);
+  if (!item) return;
+  alert(item.title + "\nManga: " + (item.manga||[]).length + "\nFigures: " + (item.figures||[]).length + "\n(Full modals in next pass)");
+}
+// --- end Anime Central ---
 </script>
 
 <div class="modal" id="modal" style="display:none !important;" style="z-index:9999;" onclick="if(event.target===this)closeModal()">
