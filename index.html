@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.025</title>
+<title>Movie Desk 0.9.026</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.025</h1>
+  <h1>Movie Desk 0.9.026</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -114,14 +114,24 @@
   <div id="secAnime" class="section">
     <div class="section-label">Anime Central</div>
     <div class="sub">Manga and figures linked to titles. Themes: Default, My Hero Academia, Frieren.</div>
-    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0;align-items:center">
       <select id="animeTheme" onchange="animeSetTheme(this.value)">
         <option value="default">Default Dark</option>
         <option value="mha">My Hero Academia</option>
         <option value="frieren">Frieren</option>
       </select>
-      <input type="text" id="animeSearch" placeholder="Search anime..." oninput="animeRender()">
-      <button onclick="animeOpenAdd()">+ Add Anime Title</button>
+      <input type="search" id="animeSearch" placeholder="Search anime..." oninput="animeRender()" style="flex:1;min-width:160px">
+      <select id="animeSort" onchange="animeRender()">
+        <option value="title">Title A-Z</option>
+        <option value="year">Year</option>
+        <option value="added">Date Added</option>
+      </select>
+    </div>
+    <div class="add-wrap" style="margin-bottom:12px">
+      <div class="add-row">
+        <input type="text" id="animeTitleInput" placeholder="Anime title..." autocomplete="off">
+        <button id="animeAddBtn">Add Anime</button>
+      </div>
     </div>
     <div id="animeGrid" class="grid"></div>
   </div>
@@ -2443,6 +2453,8 @@ $("motherAddBtn").onclick = async () => {
     } catch(e) {}
     manualTitles.unshift(m);
     saveManual();
+    // Auto-add to Anime if Animation genre
+    if (m.genres && /animation|anime/i.test(m.genres)) animeEnsure(m);
     manualTitles = JSON.parse(localStorage.getItem("md_manual") || "[]");
     field.value = "";
     field.dataset.barcode = "";
@@ -3645,12 +3657,35 @@ function animeRender(){
       </div>
     </div>`).join("");
 }
-function animeOpenAdd(){
-  const title = prompt("Anime title");
-  if (!title) return;
-  animeInv.push({ id: Date.now(), title, year:"", format:"Blu-ray", manga:[], figures:[], added:new Date().toISOString() });
-  animeSave(); animeRender();
+function animeEnsure(item){
+  if (!item || !item.title) return;
+  const key = (item.imdbId || item.title || "").toLowerCase().trim();
+  if (animeInv.some(x => (x.imdbId || x.title || "").toLowerCase().trim() === key)) return;
+  animeInv.push({
+    id: Date.now() + Math.random(),
+    title: item.title,
+    year: item.year || item.release || "",
+    format: item.discType || item.format || "Blu-ray",
+    imdbId: item.imdbId || "",
+    cover: item.coverUrl || "",
+    genres: item.genres || "",
+    manga: [],
+    figures: [],
+    added: new Date().toISOString()
+  });
+  animeSave();
+  if (currentSection === "anime") animeRender();
 }
+function animeOpenAdd(){
+  const input = $("animeTitleInput");
+  const title = (input && input.value || "").trim();
+  if (!title) { showPopup("Enter an anime title."); return; }
+  animeEnsure({ title: title, format: "Blu-ray" });
+  if (input) input.value = "";
+  showPopup("Added to Anime: " + title);
+  animeRender();
+}
+if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
   const item = animeInv.find(i => i.id == id);
   if (!item) return;
