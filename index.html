@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.026</title>
+<title>Movie Desk 0.9.027</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.026</h1>
+  <h1>Movie Desk 0.9.027</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -136,6 +136,10 @@
     <div id="animeGrid" class="grid"></div>
   </div>
   <div id="secInventory" class="section active">
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
+      <button id="shelfBtn" type="button" style="height:32px;padding:0 10px;font-size:0.78rem">Shelves</button>
+      <span id="shelfStatus" style="font-size:0.75rem;color:#888"></span>
+    </div>
     <input type="search" id="q" placeholder="Search your titles...">
     <div class="tool-row">
       <button type="button" id="filterBtn">Filter</button>
@@ -3687,13 +3691,155 @@ function animeOpenAdd(){
 }
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
-  const item = animeInv.find(i => i.id == id);
+  const item = animeInv.find(i => String(i.id) === String(id));
   if (!item) return;
-  alert(item.title + "\nManga: " + (item.manga||[]).length + "\nFigures: " + (item.figures||[]).length + "\n(Full modals in next pass)");
+  const box = document.getElementById("animeDetail") || (function(){
+    const d = document.createElement("div");
+    d.id = "animeDetail";
+    d.style.cssText = "display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:210;align-items:center;justify-content:center;padding:12px";
+    document.body.appendChild(d);
+    return d;
+  })();
+  box.style.display = "flex";
+  box.innerHTML = `
+    <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:480px;width:100%;max-height:90vh;overflow:auto">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <strong>${escWatch(item.title)}</strong>
+        <button type="button" id="animeDetClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button>
+      </div>
+      <div style="display:flex;gap:10px;margin-bottom:10px">
+        <div id="animeCoverBox" style="width:100px;height:150px;background:#222 center/cover no-repeat;border-radius:6px;cursor:pointer" title="Pick cover"></div>
+        <div style="flex:1;font-size:0.85rem">
+          <div>${item.year || ""} · ${item.format || ""}</div>
+          <div style="color:#888;margin-top:4px">${escWatch(item.genres || "")}</div>
+          <button type="button" id="animeCoverBtn" style="margin-top:8px;height:28px;padding:0 8px;font-size:0.75rem">Pick cover</button>
+        </div>
+      </div>
+      <div style="margin:8px 0"><strong>Manga (${(item.manga||[]).length})</strong></div>
+      <div id="animeMangaList">${(item.manga||[]).map((m,i)=>'<div style="padding:4px 0;border-bottom:1px solid #333">'+escWatch(m.name||"")+' <button type="button" data-rm="m'+i+'" style="float:right;background:none;border:none;color:#c66">×</button></div>').join("") || '<div style="color:#666">None</div>'}</div>
+      <input id="newManga" placeholder="Add manga volume" style="width:100%;margin:4px 0">
+      <button type="button" id="addMangaBtn" style="height:28px;padding:0 8px;font-size:0.75rem">Add Manga</button>
+      <div style="margin:10px 0"><strong>Figures (${(item.figures||[]).length})</strong></div>
+      <div id="animeFigList">${(item.figures||[]).map((f,i)=>'<div style="padding:4px 0;border-bottom:1px solid #333">'+escWatch(f.name||"")+' <button type="button" data-rm="f'+i+'" style="float:right;background:none;border:none;color:#c66">×</button></div>').join("") || '<div style="color:#666">None</div>'}</div>
+      <input id="newFig" placeholder="Add figure" style="width:100%;margin:4px 0">
+      <button type="button" id="addFigBtn" style="height:28px;padding:0 8px;font-size:0.75rem">Add Figure</button>
+    </div>`;
+  const coverBox = document.getElementById("animeCoverBox");
+  if (item.cover) coverBox.style.backgroundImage = "url(" + JSON.stringify(item.cover) + ")";
+  document.getElementById("animeDetClose").onclick = () => { box.style.display = "none"; };
+  document.getElementById("animeCoverBtn").onclick = () => animePickCover(item.id);
+  coverBox.onclick = () => animePickCover(item.id);
+  document.getElementById("addMangaBtn").onclick = () => {
+    const v = document.getElementById("newManga").value.trim();
+    if (!v) return;
+    item.manga = item.manga || [];
+    item.manga.push({ name: v, note: "" });
+    animeSave(); animeOpenDetail(id); animeRender();
+  };
+  document.getElementById("addFigBtn").onclick = () => {
+    const v = document.getElementById("newFig").value.trim();
+    if (!v) return;
+    item.figures = item.figures || [];
+    item.figures.push({ name: v, scale: "", note: "" });
+    animeSave(); animeOpenDetail(id); animeRender();
+  };
+  box.querySelectorAll("[data-rm]").forEach(btn => {
+    btn.onclick = () => {
+      const k = btn.dataset.rm;
+      const idx = parseInt(k.slice(1), 10);
+      if (k[0] === "m") item.manga.splice(idx, 1);
+      else item.figures.splice(idx, 1);
+      animeSave(); animeOpenDetail(id); animeRender();
+    };
+  });
 }
+function animePickCover(id){
+  const item = animeInv.find(i => String(i.id) === String(id));
+  if (!item) return;
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    if (!f) return;
+    const r = new FileReader();
+    r.onload = () => { item.cover = r.result; animeSave(); animeRender(); animeOpenDetail(id); };
+    r.readAsDataURL(f);
+  };
+  inp.click();
+}
+// Shelf snapshot
+let shelves = JSON.parse(localStorage.getItem("md_shelves") || "[]");
+function saveShelves(){ localStorage.setItem("md_shelves", JSON.stringify(shelves)); }
+function renderShelfList(){
+  const box = document.getElementById("shelfList");
+  if (!box) return;
+  box.innerHTML = shelves.length ? shelves.map(s => '<div style="padding:4px 0;border-bottom:1px solid #333">'+escWatch(s.name)+' · '+ (s.sections||[]).length +' sections</div>').join("") : "No shelves yet";
+}
+function openShelf(){
+  const m = document.getElementById("shelfModal");
+  if (m) { m.style.display = "flex"; renderShelfList(); buildSectionInputs(); }
+}
+function buildSectionInputs(){
+  const n = parseInt(document.getElementById("shelfSections").value, 10) || 1;
+  const box = document.getElementById("shelfSectionInputs");
+  box.innerHTML = "";
+  for (let i = 1; i <= n; i++) {
+    const d = document.createElement("div");
+    d.className = "form-row";
+    d.innerHTML = '<label>Section '+i+' photo</label><input type="file" accept="image/*" capture="environment" data-sec="'+i+'">';
+    box.appendChild(d);
+  }
+}
+if (document.getElementById("shelfBtn")) document.getElementById("shelfBtn").onclick = openShelf;
+if (document.getElementById("shelfClose")) document.getElementById("shelfClose").onclick = () => document.getElementById("shelfModal").style.display = "none";
+if (document.getElementById("shelfClose2")) document.getElementById("shelfClose2").onclick = () => document.getElementById("shelfModal").style.display = "none";
+if (document.getElementById("shelfSections")) document.getElementById("shelfSections").onchange = buildSectionInputs;
+if (document.getElementById("shelfSave")) document.getElementById("shelfSave").onclick = async () => {
+  const name = (document.getElementById("shelfName").value || "").trim();
+  if (!name) { showPopup("Need a shelf name"); return; }
+  const whole = document.getElementById("shelfWhole").files && document.getElementById("shelfWhole").files[0];
+  const secs = [];
+  document.querySelectorAll("#shelfSectionInputs input[type=file]").forEach(inp => {
+    const f = inp.files && inp.files[0];
+    if (f) secs.push({ n: inp.dataset.sec, file: f });
+  });
+  const shelf = { id: Date.now(), name, sections: [], whole: "" };
+  if (whole) {
+    const r = new FileReader();
+    await new Promise(res => { r.onload = () => { shelf.whole = r.result; res(); }; r.readAsDataURL(whole); });
+  }
+  for (const s of secs) {
+    const r = new FileReader();
+    await new Promise(res => { r.onload = () => { shelf.sections.push({ n: s.n, photo: r.result, titles: [] }); res(); }; r.readAsDataURL(s.file); });
+  }
+  shelves.push(shelf);
+  saveShelves();
+  document.getElementById("shelfModal").style.display = "none";
+  showPopup("Shelf saved: " + name + " (" + shelf.sections.length + " sections). Title matching from photos will use barcode scan or manual assign in a later pass.");
+  renderShelfList();
+};
+
 // --- end Anime Central ---
 </script>
 
+
+<div id="shelfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:12px">
+  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:420px;width:100%;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong>Shelf Snapshot</strong>
+      <button type="button" id="shelfClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button>
+    </div>
+    <div class="form-row"><label>Shelf name</label><input id="shelfName" type="text" placeholder="e.g. Horror A1"></div>
+    <div class="form-row"><label>Whole shelf photo</label><input id="shelfWhole" type="file" accept="image/*" capture="environment"></div>
+    <div class="form-row"><label>Number of sections</label><input id="shelfSections" type="number" min="1" max="20" value="3"></div>
+    <div id="shelfSectionInputs"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="shelfSave" type="button" style="flex:1;height:40px">Save shelf</button>
+      <button id="shelfClose2" type="button" class="secondary" style="flex:1;height:40px">Cancel</button>
+    </div>
+    <div id="shelfList" style="margin-top:12px;font-size:0.8rem;color:#aaa"></div>
+  </div>
+</div>
 <div class="modal" id="modal" style="display:none !important;" style="z-index:9999;" onclick="if(event.target===this)closeModal()">
   <div class="modal-box" onclick="event.stopPropagation()">
     <p id="modalMsg" style="margin:0 0 16px;"></p>
