@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.031</title>
+<title>Movie Desk 0.9.032</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.031</h1>
+  <h1>Movie Desk 0.9.032</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2485,9 +2485,17 @@ $("childTitle").oninput = () => { queueSuggest($("childTitle").value, $("childSu
 
 function parseSeasonTitle(raw) {
   if (!raw) return null;
-  const m = String(raw).match(/^(.+?)\s+(?:season|s)\s*(\d{1,2})\b/i);
-  if (!m) return null;
-  return { base: m[1].trim(), season: parseInt(m[2], 10) };
+  const words = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10,eleven:11,twelve:12};
+  const s = String(raw);
+  let m = s.match(/^(.+?)[:\s]+(?:season|s)\s*(\d{1,2})\b/i);
+  if (m) return { base: m[1].replace(/[:\s]+$/,"").trim(), season: parseInt(m[2], 10) };
+  m = s.match(/^(.+?)[:\s]+(?:season|s)\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
+  if (m) return { base: m[1].replace(/[:\s]+$/,"").trim(), season: words[m[2].toLowerCase()] || 0 };
+  m = s.match(/^(.+?)\s+(?:season|s)\s*(\d{1,2})\b/i);
+  if (m) return { base: m[1].trim(), season: parseInt(m[2], 10) };
+  m = s.match(/^(.+?)\s+(?:season|s)\s+(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/i);
+  if (m) return { base: m[1].trim(), season: words[m[2].toLowerCase()] || 0 };
+  return null;
 }
 function findMotherByBase(base) {
   const n = norm(base);
