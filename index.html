@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.027</title>
+<title>Movie Desk 0.9.029</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.027</h1>
+  <h1>Movie Desk 0.9.029</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -573,6 +573,23 @@
 
 
 
+<div id="shelfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:12px">
+  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:420px;width:100%;max-height:90vh;overflow:auto">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <strong>Shelf Snapshot</strong>
+      <button type="button" id="shelfClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button>
+    </div>
+    <div class="form-row"><label>Shelf name</label><input id="shelfName" type="text" placeholder="e.g. Horror A1"></div>
+    <div class="form-row"><label>Whole shelf photo</label><input id="shelfWhole" type="file" accept="image/*" capture="environment"></div>
+    <div class="form-row"><label>Number of sections</label><input id="shelfSections" type="number" min="1" max="20" value="3"></div>
+    <div id="shelfSectionInputs"></div>
+    <div style="display:flex;gap:8px;margin-top:10px">
+      <button id="shelfSave" type="button" style="flex:1;height:40px">Save shelf</button>
+      <button id="shelfClose2" type="button" class="secondary" style="flex:1;height:40px">Cancel</button>
+    </div>
+    <div id="shelfList" style="margin-top:12px;font-size:0.8rem;color:#aaa"></div>
+  </div>
+</div>
 <script>
 function closeModal(){
   var m = document.getElementById("modal");
@@ -1334,6 +1351,7 @@ async function refineWithOMDB(rawTitle) {
         languages: d.Language || "",
         source: "OMDB",
         discType: detectDiscType(rawTitle),
+        totalSeasons: d.totalSeasons ? parseInt(d.totalSeasons, 10) : 0,
         refined: true
       };
     }
@@ -2221,6 +2239,20 @@ function render() {
           return '<select class="child-drop" size="5" data-mother="' + m.id + '"><option value="">Children (' + m.children.length + ')</option>' + opts + '</select>';
         })()
       : "";
+    const seasonPicker = (m.isMother && m.totalSeasons && m.totalSeasons > 1)
+      ? (function() {
+          const owned = new Set(m.ownedSeasons || []);
+          let html = '<div class="season-picker" data-mother="' + m.id + '" style="margin:6px 0;display:flex;flex-wrap:wrap;gap:4px;align-items:center">';
+          html += '<span style="font-size:0.75rem;color:#aaa">Seasons:</span>';
+          for (let s = 1; s <= m.totalSeasons; s++) {
+            const on = owned.has(s);
+            html += '<span class="season-dot' + (on ? ' owned' : '') + '" data-season="' + s + '" data-mother="' + m.id + '" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:0.7rem;cursor:pointer;border:1px solid #555;background:' + (on ? '#1a5a1a' : '#222') + ';color:#fff;box-shadow:' + (on ? '0 0 6px #4f4' : 'none') + '">' + s + '</span>';
+          }
+          html += '<button type="button" class="season-save" data-mother="' + m.id + '" style="height:22px;padding:0 8px;font-size:0.7rem;margin-left:4px">Save seasons</button>';
+          html += '</div>';
+          return html;
+        })()
+      : "";
     const friendTag = friendTagFor(m.title);
     const bucket = discBucket(m);
     const badge = discBadge(bucket, fxMap);
@@ -2262,6 +2294,7 @@ function render() {
           ${genreTagHtml(m.genres)}
           ${watchNote}
           ${childDrop}
+          ${seasonPicker}
           ${pkgNote}
           ${boutNote}
           <span class="flag ${guideFlags[key]?"guide-yes":"guide-no"}" data-guide="${key}">Guide: ${guideFlags[key]?"yes":"no"}</span>
@@ -2296,6 +2329,40 @@ function bindInventoryClicks() {
       if (!guideFlags[k]) delete guideFlags[k];
       saveGuide();
       render();
+      return;
+    }
+    const seasonDot = e.target.closest && e.target.closest(".season-dot");
+    if (seasonDot) {
+      const mid = seasonDot.dataset.mother;
+      const s = parseInt(seasonDot.dataset.season, 10);
+      const m = getById(mid);
+      if (!m) return;
+      m.ownedSeasons = m.ownedSeasons || [];
+      const idx = m.ownedSeasons.indexOf(s);
+      if (idx >= 0) m.ownedSeasons.splice(idx, 1);
+      else m.ownedSeasons.push(s);
+      saveManual();
+      render();
+      return;
+    }
+    const seasonSave = e.target.closest && e.target.closest(".season-save");
+    if (seasonSave) {
+      const mid = seasonSave.dataset.mother;
+      const m = getById(mid);
+      if (!m) return;
+      const owned = m.ownedSeasons || [];
+      let added = 0;
+      owned.forEach(s => {
+        const seasonTitle = m.title + " - Season " + s;
+        if (getAll().some(x => x.motherId === mid && x.title === seasonTitle)) return;
+        const c = makeChild(seasonTitle, mid, { genres: m.genres || "", discType: m.discType || "", imdbId: m.imdbId || "" });
+        manualTitles.push(c);
+        m.children = m.children || [];
+        m.children.push(c.id);
+        added++;
+      });
+      if (added) { saveManual(); showPopup("Created " + added + " season child" + (added>1?"s":"") + " for " + m.title); render(); }
+      else showPopup("No new seasons to create.");
       return;
     }
     const bout = e.target.closest && e.target.closest("[data-boutique]");
@@ -2455,6 +2522,7 @@ $("motherAddBtn").onclick = async () => {
         if (!m.discType && r.discType) m.discType = r.discType;
       }
     } catch(e) {}
+    if (r && r.totalSeasons) m.totalSeasons = r.totalSeasons;
     manualTitles.unshift(m);
     saveManual();
     // Auto-add to Anime if Animation genre
@@ -2504,6 +2572,7 @@ $("childAddBtn").onclick = async () => {
   mother.children = mother.children || [];
   mother.children.push(c.id);
   saveManual();
+  if (c.genres && /animation|anime/i.test(c.genres)) animeEnsure(c);
   $("childTitle").value = "";
   $("childTitle").dataset.barcode = "";
   $("childTitle").dataset.imdbId = "";
@@ -3650,7 +3719,7 @@ function animeRender(){
   if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
   grid.innerHTML = list.map(item => `
     <div class="card" onclick="animeOpenDetail('${item.id}')">
-      <div class="cover" style="${item.cover ? 'background-image:url('+JSON.stringify(item.cover)+')' : ''}"></div>
+      ${item.cover ? `<img class="card-cover" src="${item.cover}" alt="" loading="lazy" style="cursor:pointer">` : `<div class="card-cover" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`}
       <div class="card-body">
         <div class="card-title">${escWatch(item.title)}</div>
         <div class="card-meta">${item.year||""} · ${item.format||""}</div>
@@ -3815,31 +3884,15 @@ if (document.getElementById("shelfSave")) document.getElementById("shelfSave").o
   shelves.push(shelf);
   saveShelves();
   document.getElementById("shelfModal").style.display = "none";
-  showPopup("Shelf saved: " + name + " (" + shelf.sections.length + " sections). Title matching from photos will use barcode scan or manual assign in a later pass.");
+  showPopup("Shelf saved: " + name + " (" + shelf.sections.length + " sections). Open a section later to assign titles from your inventory.");
   renderShelfList();
 };
 
 // --- end Anime Central ---
+
 </script>
 
 
-<div id="shelfModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:200;align-items:center;justify-content:center;padding:12px">
-  <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:420px;width:100%;max-height:90vh;overflow:auto">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <strong>Shelf Snapshot</strong>
-      <button type="button" id="shelfClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button>
-    </div>
-    <div class="form-row"><label>Shelf name</label><input id="shelfName" type="text" placeholder="e.g. Horror A1"></div>
-    <div class="form-row"><label>Whole shelf photo</label><input id="shelfWhole" type="file" accept="image/*" capture="environment"></div>
-    <div class="form-row"><label>Number of sections</label><input id="shelfSections" type="number" min="1" max="20" value="3"></div>
-    <div id="shelfSectionInputs"></div>
-    <div style="display:flex;gap:8px;margin-top:10px">
-      <button id="shelfSave" type="button" style="flex:1;height:40px">Save shelf</button>
-      <button id="shelfClose2" type="button" class="secondary" style="flex:1;height:40px">Cancel</button>
-    </div>
-    <div id="shelfList" style="margin-top:12px;font-size:0.8rem;color:#aaa"></div>
-  </div>
-</div>
 <div class="modal" id="modal" style="display:none !important;" style="z-index:9999;" onclick="if(event.target===this)closeModal()">
   <div class="modal-box" onclick="event.stopPropagation()">
     <p id="modalMsg" style="margin:0 0 16px;"></p>
