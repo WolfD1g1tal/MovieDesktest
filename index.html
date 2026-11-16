@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.029</title>
+<title>Movie Desk 0.9.031</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.029</h1>
+  <h1>Movie Desk 0.9.031</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2482,6 +2482,30 @@ wireClear("childTitle", "childClear");
 $("motherTitle").oninput = (e) => { queueSuggest($("motherTitle").value, $("motherSuggest")); $("motherClear").style.display = $("motherTitle").value ? "block" : "none"; };
 $("childTitle").oninput = () => { queueSuggest($("childTitle").value, $("childSuggest")); const x = $("childClear"); if (x) x.style.display = $("childTitle").value ? "block" : "none"; };
 
+
+function parseSeasonTitle(raw) {
+  if (!raw) return null;
+  const m = String(raw).match(/^(.+?)\s+(?:season|s)\s*(\d{1,2})\b/i);
+  if (!m) return null;
+  return { base: m[1].trim(), season: parseInt(m[2], 10) };
+}
+function findMotherByBase(base) {
+  const n = norm(base);
+  return getAll().find(x => x.isMother && norm(x.title) === n) || null;
+}
+function showDupPopup(title, onChoice) {
+  const existing = document.getElementById("dupPopup");
+  if (existing) existing.remove();
+  const box = document.createElement("div");
+  box.id = "dupPopup";
+  box.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:12px";
+  box.innerHTML = '<div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:360px;width:100%"><strong>' + escWatch(title) + '</strong><p style="font-size:0.85rem;color:#aaa;margin:8px 0">This season already exists. What do you want to do?</p><div style="display:flex;flex-direction:column;gap:6px"><button type="button" id="dupCopy" style="height:36px">Add as another copy</button><button type="button" id="dupMark" style="height:36px">Just mark owned</button><button type="button" id="dupSkip" style="height:36px;background:#333">Skip</button></div></div>';
+  document.body.appendChild(box);
+  box.querySelector("#dupCopy").onclick = () => { box.remove(); onChoice("copy"); };
+  box.querySelector("#dupMark").onclick = () => { box.remove(); onChoice("mark"); };
+  box.querySelector("#dupSkip").onclick = () => { box.remove(); onChoice("skip"); };
+}
+
 $("motherAddBtn").onclick = async () => {
   try {
     const field = $("motherTitle");
@@ -2490,6 +2514,56 @@ $("motherAddBtn").onclick = async () => {
     if (!t) { showPopup("Nothing to add."); return; }
     const typedBarcode = (/^\d{8,14}$/.test(t)) ? t : "";
     const barcode = field.dataset.barcode || typedBarcode;
+    const seasonInfo = parseSeasonTitle(t);
+    if (seasonInfo) {
+      let mother = findMotherByBase(seasonInfo.base);
+      if (!mother) {
+        mother = makeMother(seasonInfo.base, { totalSeasons: 0, ownedSeasons: [] });
+        manualTitles.unshift(mother);
+        saveManual();
+      }
+      const seasonTitle = seasonInfo.base + " - Season " + seasonInfo.season;
+      const existingChild = getAll().find(x => x.motherId === mother.id && norm(x.title) === norm(seasonTitle));
+      if (existingChild) {
+        showDupPopup(seasonTitle, (choice) => {
+          if (choice === "copy") {
+            const c = makeChild(seasonTitle + " (copy)", mother.id, { genres: mother.genres || "", discType: mother.discType || "" });
+            manualTitles.push(c);
+            mother.children = mother.children || [];
+            mother.children.push(c.id);
+            if (!mother.ownedSeasons) mother.ownedSeasons = [];
+            if (!mother.ownedSeasons.includes(seasonInfo.season)) mother.ownedSeasons.push(seasonInfo.season);
+            saveManual();
+            showPopup("Added copy of " + seasonTitle);
+            render();
+          } else if (choice === "mark") {
+            if (!mother.ownedSeasons) mother.ownedSeasons = [];
+            if (!mother.ownedSeasons.includes(seasonInfo.season)) mother.ownedSeasons.push(seasonInfo.season);
+            saveManual();
+            showPopup("Marked season " + seasonInfo.season + " as owned");
+            render();
+          }
+        });
+        field.value = "";
+        return;
+      }
+      const c = makeChild(seasonTitle, mother.id, {
+        barcode: barcode,
+        imdbId: field.dataset.imdbId || "",
+        genres: field.dataset.genres || "",
+        discType: field.dataset.discType || detectDiscType(t)
+      });
+      manualTitles.push(c);
+      mother.children = mother.children || [];
+      mother.children.push(c.id);
+      if (!mother.ownedSeasons) mother.ownedSeasons = [];
+      if (!mother.ownedSeasons.includes(seasonInfo.season)) mother.ownedSeasons.push(seasonInfo.season);
+      saveManual();
+      showPopup("Added " + seasonTitle + " under " + mother.title);
+      field.value = "";
+      render();
+      return;
+    }
     const m = makeMother(t, {
       barcode: barcode,
       imdbId: field.dataset.imdbId || "",
@@ -2520,9 +2594,9 @@ $("motherAddBtn").onclick = async () => {
         if (!m.languages && r.languages) m.languages = r.languages;
         if (!m.source && r.source) m.source = r.source;
         if (!m.discType && r.discType) m.discType = r.discType;
+        if (r.totalSeasons) m.totalSeasons = r.totalSeasons;
       }
     } catch(e) {}
-    if (r && r.totalSeasons) m.totalSeasons = r.totalSeasons;
     manualTitles.unshift(m);
     saveManual();
     // Auto-add to Anime if Animation genre
