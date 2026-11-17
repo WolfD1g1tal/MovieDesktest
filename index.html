@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.032</title>
+<title>Movie Desk 0.9.035</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.032</h1>
+  <h1>Movie Desk 0.9.035</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2302,6 +2302,7 @@ function render() {
           ${ratingBadge(m)}
         </div>
         ${ssOnCard() ? `<div class="card-ss" style="margin-top:6px;"><span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">ss: ${isYes?"yes":"no"}</span></div>` : ""}
+        <div style="margin-top:8px;text-align:right"><button type="button" class="del-card" data-del="${m.id||""}" style="background:none;border:none;color:#c66;font-size:0.8rem;padding:2px 6px;cursor:pointer">Delete</button></div>
       </div>
     </div>`;
   }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
@@ -2312,6 +2313,46 @@ function bindInventoryClicks() {
   if (!box || box.dataset.bound === "1") return;
   box.dataset.bound = "1";
   box.addEventListener("click", (e) => {
+    const del = e.target.closest && e.target.closest("[data-del]");
+    if (del) {
+      const id = del.dataset.del;
+      if (!id) return;
+      const all = getAll();
+      const item = all.find(x => String(x.id) === String(id));
+      if (!item) return;
+      const isMother = item.isMother && item.children && item.children.length;
+      const existing = document.getElementById("delPopup");
+      if (existing) existing.remove();
+      const box = document.createElement("div");
+      box.id = "delPopup";
+      box.style.cssText = "position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:300;display:flex;align-items:center;justify-content:center;padding:12px";
+      box.innerHTML = '<div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:340px;width:100%"><strong>Delete ' + escWatch(item.title || "title") + '?</strong>' +
+        (isMother ? '<label style="display:block;margin:10px 0;font-size:0.85rem"><input type="checkbox" id="delKeepKids"> Keep children (uncheck to delete them)</label>' : '') +
+        '<div style="display:flex;gap:8px;margin-top:10px"><button type="button" id="delYes" style="flex:1;height:36px;background:#a33;color:#fff;border:none;border-radius:6px">Delete</button><button type="button" id="delNo" style="flex:1;height:36px;background:#333;color:#fff;border:none;border-radius:6px">Cancel</button></div></div>';
+      document.body.appendChild(box);
+      box.querySelector("#delNo").onclick = () => box.remove();
+      box.querySelector("#delYes").onclick = () => {
+        const keep = isMother && box.querySelector("#delKeepKids") && box.querySelector("#delKeepKids").checked;
+        if (manualTitles.some(x => String(x.id) === String(id))) {
+          manualTitles = manualTitles.filter(x => String(x.id) !== String(id));
+          saveManual();
+        } else {
+          collection = collection.filter(x => String(x.id) !== String(id));
+          saveColl();
+        }
+        if (isMother && !keep) {
+          item.children.forEach(cid => {
+            manualTitles = manualTitles.filter(x => String(x.id) !== String(cid));
+            collection = collection.filter(x => String(x.id) !== String(cid));
+          });
+          saveManual(); saveColl();
+        }
+        box.remove();
+        showPopup("Deleted");
+        render();
+      };
+      return;
+    }
     const pick = e.target.closest && e.target.closest("[data-pick]");
     if (pick) { pickCover(pick.dataset.pick); return; }
     const homo = e.target.closest && e.target.closest(".flag[data-key]");
@@ -3799,18 +3840,28 @@ function animeRender(){
   const grid = $("animeGrid");
   if (!grid) return;
   if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
-  grid.innerHTML = list.map(item => `
-    <div class="card" onclick="animeOpenDetail('${item.id}')">
-      ${item.cover ? `<img class="card-cover" src="${item.cover}" alt="" loading="lazy" style="cursor:pointer">` : `<div class="card-cover" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`}
+  grid.innerHTML = list.map(item => {
+    const cover = item.cover ? `<img class="card-cover" data-anime-pick="${item.id}" src="${item.cover}" alt="" loading="lazy" style="cursor:pointer">` : `<div class="card-cover" data-anime-pick="${item.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
+    const badge = discBadge(discBucket({discType:item.format||"", title:item.title}), {});
+    const genres = genreTagHtml(item.genres || "");
+    const imdb = item.imdbId ? `<span class="flag imdb">IMDb: ${item.publicRating||"-"}</span>` : `<span class="flag imdb">IMDb: -</span>`;
+    return `<div class="card">
+      ${cover}
       <div class="card-body">
-        <div class="card-title">${escWatch(item.title)}</div>
-        <div class="card-meta">${item.year||""} · ${item.format||""}</div>
-        <div class="badges">
+        <div class="card-title" data-anime-id="${item.id}">${escWatch(item.title)}</div>
+        <div class="card-meta">${item.year||""}${item.format ? " · " + item.format : ""}</div>
+        <div class="card-flags">
+          ${badge}
+          <span class="flag own">Owned</span>
+          ${genres}
+          ${imdb}
           ${(item.manga||[]).length ? '<span class="badge manga">Manga '+item.manga.length+'</span>' : ''}
           ${(item.figures||[]).length ? '<span class="badge figure">Figures '+item.figures.length+'</span>' : ''}
         </div>
+        <div style="margin-top:8px;text-align:right"><button type="button" class="del-anime" data-anime-del="${item.id}" style="background:none;border:none;color:#c66;font-size:0.8rem;padding:2px 6px;cursor:pointer">Delete</button></div>
       </div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 function animeEnsure(item){
   if (!item || !item.title) return;
@@ -3907,17 +3958,55 @@ function animeOpenDetail(id){
 function animePickCover(id){
   const item = animeInv.find(i => String(i.id) === String(id));
   if (!item) return;
-  const inp = document.createElement("input");
-  inp.type = "file"; inp.accept = "image/*";
-  inp.onchange = () => {
-    const f = inp.files && inp.files[0];
-    if (!f) return;
-    const r = new FileReader();
-    r.onload = () => { item.cover = r.result; animeSave(); animeRender(); animeOpenDetail(id); };
-    r.readAsDataURL(f);
+  const fake = { id: item.id, title: item.title, imdbId: item.imdbId || "", barcode: item.barcode || "", coverUrl: item.cover || "", genres: item.genres || "" };
+  currentPickId = id;
+  selectedCoverUrl = null;
+  const box = document.getElementById("coverPicker");
+  if (!box) return;
+  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px">?</button></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + escWatch(item.title) + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button></div></div>';
+  box.style.display = "flex";
+  const thumbs = document.getElementById("coverThumbs");
+  thumbs.innerHTML = '<span style="color:#888">Loading covers...</span>';
+  gatherCovers(fake).then(urls => {
+    thumbs.innerHTML = urls.map(u => {
+      const src = (u.thumb || u.url).replace(/"/g, "");
+      const full = String(u.url).replace(/"/g, "");
+      return '<img src="' + src + '" data-full="' + full + '" style="width:80px;height:120px;object-fit:cover;border-radius:4px;cursor:pointer;border:2px solid transparent">';
+    }).join("") || '<span style="color:#888">No covers found</span>';
+    thumbs.querySelectorAll("img").forEach(img => {
+      img.onclick = () => {
+        thumbs.querySelectorAll("img").forEach(i => i.style.borderColor = "transparent");
+        img.style.borderColor = "#6af";
+        selectedCoverUrl = img.dataset.full;
+        document.getElementById("coverUseSel").disabled = false;
+      };
+    });
+  });
+  document.getElementById("coverCancel").onclick = () => box.style.display = "none";
+  document.getElementById("coverUseSel").onclick = () => {
+    if (selectedCoverUrl) { item.cover = selectedCoverUrl; animeSave(); animeRender(); box.style.display = "none"; if (document.getElementById("animeDetail") && document.getElementById("animeDetail").style.display !== "none") animeOpenDetail(id); }
   };
-  inp.click();
+  document.getElementById("coverAddUrl").onclick = () => {
+    const v = document.getElementById("coverPaste").value.trim();
+    if (v) { item.cover = v; animeSave(); animeRender(); box.style.display = "none"; }
+  };
+  box.onclick = function(e) { if (e.target === box) box.style.display = "none"; };
 }
+document.addEventListener("click", (e) => {
+  const pick = e.target.closest && e.target.closest("[data-anime-pick]");
+  if (pick) { animePickCover(pick.dataset.animePick); return; }
+  const del = e.target.closest && e.target.closest("[data-anime-del]");
+  if (del) {
+    const id = del.dataset.animeDel;
+    if (!confirm("Delete this anime title?")) return;
+    animeInv = animeInv.filter(x => String(x.id) !== String(id));
+    animeSave();
+    animeRender();
+    return;
+  }
+  const title = e.target.closest && e.target.closest("[data-anime-id]");
+  if (title) animeOpenDetail(title.dataset.animeId);
+});
 // Shelf snapshot
 let shelves = JSON.parse(localStorage.getItem("md_shelves") || "[]");
 function saveShelves(){ localStorage.setItem("md_shelves", JSON.stringify(shelves)); }
