@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.10.003</title>
+<title>Movie Desk 0.10.004</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -104,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.10.003</h1>
+  <h1>Movie Desk 0.10.004</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -139,6 +139,27 @@
         <button id="animeAddBtn">Add Anime</button>
       </div>
     </div>
+    <div class="tool-row" style="margin-bottom:6px">
+      <button type="button" id="animeFilterBtn">Filter</button>
+    </div>
+    <div id="animeFilterChips" style="display:flex;gap:6px;flex-wrap:wrap;margin:6px 0;min-height:28px"></div>
+    <div id="animeFilterPanel" class="filter-panel" style="display:none">
+      <label>Format
+        <select id="animeFilterFormat">
+          <option value="">All</option>
+          <option value="Blu-ray">Blu-ray</option>
+          <option value="DVD">DVD</option>
+          <option value="4K">4K</option>
+        </select>
+      </label>
+      <label>Genre
+        <input id="animeFilterGenre" type="text" placeholder="e.g. Action, Comedy" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>Year
+        <input id="animeFilterYear" type="text" placeholder="e.g. 2020 or 2010-2020" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <button type="button" id="animeFilterClear" style="height:36px;margin-top:8px;">Clear filters</button>
+    </div>
     <div id="animeGrid" class="grid"></div>
   </div>
   <div id="secInventory" class="section active">
@@ -170,6 +191,15 @@
           <option value="dvd">DVD</option>
           <option value="other">Other</option>
         </select>
+      </label>
+      <label>Genre
+        <input id="filterGenre" type="text" placeholder="e.g. Horror, Animation" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>Year
+        <input id="filterYear" type="text" placeholder="e.g. 2020 or 2010-2020" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>IMDb min
+        <input id="filterImdb" type="number" min="0" max="10" step="0.1" placeholder="0-10" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
       </label>
       <label>Boutique
         <select id="filterBout">
@@ -2218,7 +2248,21 @@ function render() {
   const disc = $("filterDisc") ? $("filterDisc").value : "";
   const bout = $("filterBout") ? $("filterBout").value : "";
   const homo = $("filterHomo") ? $("filterHomo").value : "";
+  const gen = ($("filterGenre") && $("filterGenre").value || "").toLowerCase();
+  const yr = $("filterYear") && $("filterYear").value;
+  const imdbMin = parseFloat($("filterImdb") && $("filterImdb").value) || 0;
   if (disc) all = all.filter(m => discBucket(m) === disc);
+  if (gen) all = all.filter(m => (m.genres||"").toLowerCase().includes(gen));
+  if (yr) {
+    const parts = yr.split("-").map(s => parseInt(s.trim(),10));
+    all = all.filter(m => {
+      const y = parseInt(m.year, 10);
+      if (!y) return false;
+      if (parts.length === 2) return y >= parts[0] && y <= parts[1];
+      return y === parts[0];
+    });
+  }
+  if (imdbMin) all = all.filter(m => parseFloat(m.publicRating) >= imdbMin);
   if (bout === "yes") all = all.filter(m => !!(boutiqueFlags[m.id] || m.boutiqueLabel));
   if (bout === "no") all = all.filter(m => !(boutiqueFlags[m.id] || m.boutiqueLabel));
   if (homo === "yes") all = all.filter(m => !!homoFlags[homoKey(m)]);
@@ -3870,7 +3914,21 @@ function animeSetTheme(t){
 }
 function animeRender(){
   const q = ($("animeSearch") && $("animeSearch").value || "").toLowerCase();
-  const list = animeInv.filter(i => (i.title||"").toLowerCase().includes(q));
+  const fmt = $("animeFilterFormat") && $("animeFilterFormat").value;
+  const gen = ($("animeFilterGenre") && $("animeFilterGenre").value || "").toLowerCase();
+  const yr = $("animeFilterYear") && $("animeFilterYear").value;
+  let list = animeInv.filter(i => (i.title||"").toLowerCase().includes(q));
+  if (fmt) list = list.filter(i => (i.format||"").toLowerCase().includes(fmt.toLowerCase()));
+  if (gen) list = list.filter(i => (i.genres||"").toLowerCase().includes(gen));
+  if (yr) {
+    const parts = yr.split("-").map(s => parseInt(s.trim(),10));
+    list = list.filter(i => {
+      const y = parseInt(i.year, 10);
+      if (!y) return false;
+      if (parts.length === 2) return y >= parts[0] && y <= parts[1];
+      return y === parts[0];
+    });
+  }
   const grid = $("animeGrid");
   if (!grid) return;
   if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
@@ -3974,6 +4032,18 @@ function animeOpenAdd(){
   showPopup("Added to Anime: " + title);
   animeRender();
 }
+
+if ($("animeFilterBtn")) $("animeFilterBtn").onclick = () => {
+  const p = $("animeFilterPanel");
+  if (p) p.style.display = p.style.display === "none" ? "block" : "none";
+};
+if ($("animeFilterClear")) $("animeFilterClear").onclick = () => {
+  if ($("animeFilterFormat")) $("animeFilterFormat").value = "";
+  if ($("animeFilterGenre")) $("animeFilterGenre").value = "";
+  if ($("animeFilterYear")) $("animeFilterYear").value = "";
+  animeRender();
+};
+
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
   const item = animeInv.find(i => String(i.id) === String(id));
