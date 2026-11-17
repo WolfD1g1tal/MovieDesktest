@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.9.035</title>
+<title>Movie Desk 0.10.001</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -21,7 +21,13 @@
   .suggest div:hover, .buy-results div:hover { background: #2a2a2a; }
   #scanner { display: none; margin: 12px 0; }
   #scanner video { width: 100%; border-radius: 12px; background: #000; }
-  .card { display:flex;  background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 10px; display: flex; gap: 14px; align-items: flex-start; content-visibility: auto; contain-intrinsic-size: auto 204px; }
+  .card { display:flex;  background: #161616; border: 1px solid #2a2a2a; border-radius: 12px; padding: 12px; margin-bottom: 0; display: flex; flex-direction: column; gap: 8px; align-items: stretch; content-visibility: auto; contain-intrinsic-size: auto 280px; }
+  #out, #animeGrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(160px, 1fr)); gap: 10px; }
+  @media (min-width: 600px) {
+    #out, #animeGrid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+  }
+  .card .card-cover { width: 100%; height: 220px; object-fit: cover; }
+  .card .card-body { padding: 0; }
   .card-cover { width: 120px; height: 180px; object-fit: cover; border-radius: 6px; background: #222; flex-shrink: 0; }
   .card-body { flex: 1; min-width: 0; }
   .card-title { font-weight: 500; font-size: 1.05rem; margin: 0 0 2px; cursor: pointer; }
@@ -98,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.9.035</h1>
+  <h1>Movie Desk 0.10.001</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -3858,6 +3864,16 @@ function animeRender(){
           ${(item.manga||[]).length ? '<span class="badge manga">Manga '+item.manga.length+'</span>' : ''}
           ${(item.figures||[]).length ? '<span class="badge figure">Figures '+item.figures.length+'</span>' : ''}
         </div>
+        ${(item.totalSeasons && item.totalSeasons > 1) ? (function(){
+          const owned = new Set(item.ownedSeasons || []);
+          let html = '<div style="margin:6px 0;display:flex;flex-wrap:wrap;gap:4px;align-items:center"><span style="font-size:0.75rem;color:#aaa">Seasons:</span>';
+          for (let s = 1; s <= item.totalSeasons; s++) {
+            const on = owned.has(s);
+            html += '<span class="anime-season" data-anime-season="' + s + '" data-anime-id="' + item.id + '" style="display:inline-flex;align-items:center;justify-content:center;width:22px;height:22px;border-radius:50%;font-size:0.7rem;cursor:pointer;border:1px solid #555;background:' + (on ? '#1a5a1a' : '#222') + ';color:#fff;box-shadow:' + (on ? '0 0 6px #4f4' : 'none') + '">' + s + '</span>';
+          }
+          html += '</div>';
+          return html;
+        })() : ''}
         <div style="margin-top:8px;text-align:right"><button type="button" class="del-anime" data-anime-del="${item.id}" style="background:none;border:none;color:#c66;font-size:0.8rem;padding:2px 6px;cursor:pointer">Delete</button></div>
       </div>
     </div>`;
@@ -3865,9 +3881,36 @@ function animeRender(){
 }
 function animeEnsure(item){
   if (!item || !item.title) return;
+  const seasonInfo = parseSeasonTitle(item.title);
+  if (seasonInfo) {
+    let mother = animeInv.find(x => norm(x.title) === norm(seasonInfo.base));
+    if (!mother) {
+      mother = {
+        id: Date.now() + Math.random(),
+        title: seasonInfo.base,
+        year: item.year || "",
+        format: item.discType || item.format || "Blu-ray",
+        imdbId: item.imdbId || "",
+        cover: item.coverUrl || "",
+        genres: item.genres || "",
+        totalSeasons: item.totalSeasons || 0,
+        ownedSeasons: [seasonInfo.season],
+        manga: [],
+        figures: [],
+        added: new Date().toISOString()
+      };
+      animeInv.push(mother);
+    } else {
+      if (!mother.ownedSeasons) mother.ownedSeasons = [];
+      if (!mother.ownedSeasons.includes(seasonInfo.season)) mother.ownedSeasons.push(seasonInfo.season);
+    }
+    animeSave();
+    if (currentSection === "anime") animeRender();
+    return;
+  }
   const key = (item.imdbId || item.title || "").toLowerCase().trim();
   if (animeInv.some(x => (x.imdbId || x.title || "").toLowerCase().trim() === key)) return;
-  animeInv.push({
+  const entry = {
     id: Date.now() + Math.random(),
     title: item.title,
     year: item.year || item.release || "",
@@ -3875,12 +3918,24 @@ function animeEnsure(item){
     imdbId: item.imdbId || "",
     cover: item.coverUrl || "",
     genres: item.genres || "",
+    totalSeasons: item.totalSeasons || 0,
+    ownedSeasons: item.ownedSeasons || [],
     manga: [],
     figures: [],
     added: new Date().toISOString()
-  });
+  };
+  animeInv.push(entry);
   animeSave();
   if (currentSection === "anime") animeRender();
+  if (!entry.totalSeasons && entry.imdbId) {
+    omdbById(entry.imdbId).then(d => {
+      if (d && d.totalSeasons) {
+        entry.totalSeasons = parseInt(d.totalSeasons, 10);
+        animeSave();
+        if (currentSection === "anime") animeRender();
+      }
+    }).catch(()=>{});
+  }
 }
 function animeOpenAdd(){
   const input = $("animeTitleInput");
@@ -3993,6 +4048,20 @@ function animePickCover(id){
   box.onclick = function(e) { if (e.target === box) box.style.display = "none"; };
 }
 document.addEventListener("click", (e) => {
+  const season = e.target.closest && e.target.closest(".anime-season");
+  if (season) {
+    const id = season.dataset.animeId;
+    const s = parseInt(season.dataset.animeSeason, 10);
+    const item = animeInv.find(x => String(x.id) === String(id));
+    if (!item) return;
+    item.ownedSeasons = item.ownedSeasons || [];
+    const idx = item.ownedSeasons.indexOf(s);
+    if (idx >= 0) item.ownedSeasons.splice(idx, 1);
+    else item.ownedSeasons.push(s);
+    animeSave();
+    animeRender();
+    return;
+  }
   const pick = e.target.closest && e.target.closest("[data-anime-pick]");
   if (pick) { animePickCover(pick.dataset.animePick); return; }
   const del = e.target.closest && e.target.closest("[data-anime-del]");
