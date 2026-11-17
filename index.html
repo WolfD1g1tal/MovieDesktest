@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.10.008</title>
+<title>Movie Desk 0.10.009</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -104,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.10.008</h1>
+  <h1>Movie Desk 0.10.009</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2297,6 +2297,7 @@ function populateGenreYear() {
 }
 
 function render() {
+  try {
   populateGenreYear();
   const q = norm($("q").value);
   let all = getAll();
@@ -2314,14 +2315,18 @@ function render() {
   const disc = $("filterDisc") ? $("filterDisc").value : "";
   const bout = $("filterBout") ? $("filterBout").value : "";
   const homo = $("filterHomo") ? $("filterHomo").value : "";
-  const gen = $("filterGenre") && $("filterGenre").value;
-  const ymin = parseInt($("filterYearMin") && $("filterYearMin").value, 10) || 0;
-  const ymax = parseInt($("filterYearMax") && $("filterYearMax").value, 10) || 9999;
-  const yexact = parseInt($("filterYearExact") && $("filterYearExact").value, 10) || 0;
-  const imdbMin = parseFloat($("filterImdb") && $("filterImdb").value) || 0;
+  const gen = ($("filterGenre") && $("filterGenre").value) || "";
+  const yminRaw = $("filterYearMin") && $("filterYearMin").value;
+  const ymaxRaw = $("filterYearMax") && $("filterYearMax").value;
+  const ymin = yminRaw ? parseInt(yminRaw, 10) : 0;
+  const ymax = ymaxRaw ? parseInt(ymaxRaw, 10) : 0;
+  const yexactRaw = $("filterYearExact") && $("filterYearExact").value;
+  const yexact = yexactRaw ? parseInt(yexactRaw, 10) : 0;
+  const imdbRaw = $("filterImdb") && $("filterImdb").value;
+  const imdbMin = imdbRaw ? parseFloat(imdbRaw) : 0;
   if (disc) all = all.filter(m => discBucket(m) === disc);
   if (gen) all = all.filter(m => (m.genres||"").toLowerCase().includes(gen.toLowerCase()));
-  if (ymin || ymax < 9999) all = all.filter(m => { const y = parseInt(m.year,10); return y && y >= ymin && y <= ymax; });
+  if (ymin || ymax) all = all.filter(m => { const y = parseInt(m.year,10); if (!y) return false; if (ymin && y < ymin) return false; if (ymax && y > ymax) return false; return true; });
   if (yexact) all = all.filter(m => parseInt(m.year,10) === yexact);
   if (imdbMin) all = all.filter(m => parseFloat(m.publicRating) >= imdbMin);
   if (bout === "yes") all = all.filter(m => !!(boutiqueFlags[m.id] || m.boutiqueLabel));
@@ -2445,7 +2450,7 @@ function render() {
       </div>
     </div>`;
   }).join("") || `<div style="text-align:center;color:#777;padding:40px">No titles</div>`;
-
+  } catch(e) { console.error(e); $("out").innerHTML = '<div style="color:#c66;padding:20px">Render error: ' + e.message + '</div>'; }
 }
 function bindInventoryClicks() {
   const box = $("out");
