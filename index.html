@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.10.009</title>
+<title>Movie Desk 0.10.011</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -104,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.10.009</h1>
+  <h1>Movie Desk 0.10.011</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2296,6 +2296,29 @@ function populateGenreYear() {
   }
 }
 
+
+const mdErrors = [];
+function mdCatch(name, fn) {
+  return function(...args) {
+    try { return fn.apply(this, args); }
+    catch (e) {
+      const msg = name + ": " + (e && e.message ? e.message : e);
+      mdErrors.push({ t: Date.now(), msg });
+      if (mdErrors.length > 20) mdErrors.shift();
+      const box = document.getElementById("mdErrBox") || (function(){
+        const d = document.createElement("div");
+        d.id = "mdErrBox";
+        d.style.cssText = "position:fixed;bottom:60px;left:8px;right:8px;background:#3a1a1a;border:1px solid #a33;color:#fcc;padding:8px 10px;border-radius:8px;font-size:0.75rem;z-index:400;max-height:120px;overflow:auto";
+        document.body.appendChild(d);
+        return d;
+      })();
+      box.innerHTML = mdErrors.slice(-5).map(x => escWatch(x.msg)).join("<br>");
+      box.style.display = "block";
+      console.error(msg, e);
+    }
+  };
+}
+
 function render() {
   try {
   populateGenreYear();
@@ -2316,19 +2339,19 @@ function render() {
   const bout = $("filterBout") ? $("filterBout").value : "";
   const homo = $("filterHomo") ? $("filterHomo").value : "";
   const gen = ($("filterGenre") && $("filterGenre").value) || "";
-  const yminRaw = $("filterYearMin") && $("filterYearMin").value;
-  const ymaxRaw = $("filterYearMax") && $("filterYearMax").value;
+  const yminRaw = ($("filterYearMin") && $("filterYearMin").value || "").trim();
+  const ymaxRaw = ($("filterYearMax") && $("filterYearMax").value || "").trim();
   const ymin = yminRaw ? parseInt(yminRaw, 10) : 0;
   const ymax = ymaxRaw ? parseInt(ymaxRaw, 10) : 0;
-  const yexactRaw = $("filterYearExact") && $("filterYearExact").value;
+  const yexactRaw = ($("filterYearExact") && $("filterYearExact").value || "").trim();
   const yexact = yexactRaw ? parseInt(yexactRaw, 10) : 0;
-  const imdbRaw = $("filterImdb") && $("filterImdb").value;
+  const imdbRaw = ($("filterImdb") && $("filterImdb").value || "").trim();
   const imdbMin = imdbRaw ? parseFloat(imdbRaw) : 0;
   if (disc) all = all.filter(m => discBucket(m) === disc);
   if (gen) all = all.filter(m => (m.genres||"").toLowerCase().includes(gen.toLowerCase()));
-  if (ymin || ymax) all = all.filter(m => { const y = parseInt(m.year,10); if (!y) return false; if (ymin && y < ymin) return false; if (ymax && y > ymax) return false; return true; });
-  if (yexact) all = all.filter(m => parseInt(m.year,10) === yexact);
-  if (imdbMin) all = all.filter(m => parseFloat(m.publicRating) >= imdbMin);
+  if (ymin > 0 || ymax > 0) all = all.filter(m => { const y = parseInt(m.year,10); if (!y) return false; if (ymin > 0 && y < ymin) return false; if (ymax > 0 && y > ymax) return false; return true; });
+  if (yexact > 0) all = all.filter(m => parseInt(m.year,10) === yexact);
+  if (imdbMin > 0) all = all.filter(m => parseFloat(m.publicRating) >= imdbMin);
   if (bout === "yes") all = all.filter(m => !!(boutiqueFlags[m.id] || m.boutiqueLabel));
   if (bout === "no") all = all.filter(m => !(boutiqueFlags[m.id] || m.boutiqueLabel));
   if (homo === "yes") all = all.filter(m => !!homoFlags[homoKey(m)]);
@@ -3981,15 +4004,18 @@ function animeSetTheme(t){
 function animeRender(){
   const q = ($("animeSearch") && $("animeSearch").value || "").toLowerCase();
   const fmt = $("animeFilterFormat") && $("animeFilterFormat").value;
-  const gen = $("animeFilterGenre") && $("animeFilterGenre").value;
-  const ymin = parseInt($("animeFilterYearMin") && $("animeFilterYearMin").value, 10) || 0;
-  const ymax = parseInt($("animeFilterYearMax") && $("animeFilterYearMax").value, 10) || 9999;
-  const yexact = parseInt($("animeFilterYearExact") && $("animeFilterYearExact").value, 10) || 0;
+  const gen = ($("animeFilterGenre") && $("animeFilterGenre").value) || "";
+  const yminRaw = ($("animeFilterYearMin") && $("animeFilterYearMin").value || "").trim();
+  const ymaxRaw = ($("animeFilterYearMax") && $("animeFilterYearMax").value || "").trim();
+  const ymin = yminRaw ? parseInt(yminRaw, 10) : 0;
+  const ymax = ymaxRaw ? parseInt(ymaxRaw, 10) : 0;
+  const yexactRaw = ($("animeFilterYearExact") && $("animeFilterYearExact").value || "").trim();
+  const yexact = yexactRaw ? parseInt(yexactRaw, 10) : 0;
   let list = animeInv.filter(i => (i.title||"").toLowerCase().includes(q));
   if (fmt) list = list.filter(i => (i.format||"").toLowerCase().includes(fmt.toLowerCase()));
   if (gen) list = list.filter(i => (i.genres||"").toLowerCase().includes(gen.toLowerCase()));
-  if (ymin || ymax < 9999) list = list.filter(i => { const y = parseInt(i.year,10); return y && y >= ymin && y <= ymax; });
-  if (yexact) list = list.filter(i => parseInt(i.year,10) === yexact);
+  if (ymin > 0 || ymax > 0) list = list.filter(i => { const y = parseInt(i.year,10); if (!y) return false; if (ymin > 0 && y < ymin) return false; if (ymax > 0 && y > ymax) return false; return true; });
+  if (yexact > 0) list = list.filter(i => parseInt(i.year,10) === yexact);
   const grid = $("animeGrid");
   if (!grid) return;
   if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
@@ -4308,6 +4334,19 @@ if (document.getElementById("shelfSave")) document.getElementById("shelfSave").o
 
 // --- end Anime Central ---
 
+
+window.onerror = function(msg, src, line, col, err) {
+  const box = document.getElementById("mdErrBox") || (function(){
+    const d = document.createElement("div");
+    d.id = "mdErrBox";
+    d.style.cssText = "position:fixed;bottom:60px;left:8px;right:8px;background:#3a1a1a;border:1px solid #a33;color:#fcc;padding:8px 10px;border-radius:8px;font-size:0.75rem;z-index:400;max-height:120px;overflow:auto";
+    document.body.appendChild(d);
+    return d;
+  })();
+  box.innerHTML = (box.innerHTML ? box.innerHTML + "<br>" : "") + escWatch(String(msg) + " (line " + line + ")");
+  box.style.display = "block";
+  return false;
+};
 </script>
 
 
