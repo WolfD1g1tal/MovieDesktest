@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.10.004</title>
+<title>Movie Desk 0.10.007</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -104,7 +104,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.10.004</h1>
+  <h1>Movie Desk 0.10.007</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -153,10 +153,16 @@
         </select>
       </label>
       <label>Genre
-        <input id="animeFilterGenre" type="text" placeholder="e.g. Action, Comedy" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+        <select id="animeFilterGenre"><option value="">All</option></select>
       </label>
-      <label>Year
-        <input id="animeFilterYear" type="text" placeholder="e.g. 2020 or 2010-2020" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      <label>Year min
+        <input id="animeFilterYearMin" type="number" min="1900" max="2100" placeholder="1900" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>Year max
+        <input id="animeFilterYearMax" type="number" min="1900" max="2100" placeholder="2100" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>Exact year
+        <select id="animeFilterYearExact" size="5" style="width:100%;background:#111;color:#eee;border:1px solid #333;border-radius:6px"><option value="">Any</option></select>
       </label>
       <button type="button" id="animeFilterClear" style="height:36px;margin-top:8px;">Clear filters</button>
     </div>
@@ -193,10 +199,16 @@
         </select>
       </label>
       <label>Genre
-        <input id="filterGenre" type="text" placeholder="e.g. Horror, Animation" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+        <select id="filterGenre"><option value="">All</option></select>
       </label>
-      <label>Year
-        <input id="filterYear" type="text" placeholder="e.g. 2020 or 2010-2020" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      <label>Year min
+        <input id="filterYearMin" type="number" min="1900" max="2100" placeholder="1900" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>Year max
+        <input id="filterYearMax" type="number" min="1900" max="2100" placeholder="2100" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
+      </label>
+      <label>Exact year
+        <select id="filterYearExact" size="5" style="width:100%;background:#111;color:#eee;border:1px solid #333;border-radius:6px"><option value="">Any</option></select>
       </label>
       <label>IMDb min
         <input id="filterImdb" type="number" min="0" max="10" step="0.1" placeholder="0-10" style="width:100%;height:32px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px">
@@ -1343,6 +1355,18 @@ function makeChild(title, motherId, extra={}){
   };
 }
 
+
+function displayTitle(raw) {
+  if (!raw) return "";
+  let t = String(raw);
+  t = t.replace(/\s*[\(\[].{0,40}[\)\]]/g, " ");
+  t = t.replace(/\s*[-–—]\s*(Blu[- ]?ray|DVD|4K|UHD|Steelbook|Slipcover|Combo|Disc).*$/i, "");
+  t = t.replace(/\s*\+\s*W\/.*$/i, "");
+  t = t.replace(/\s{2,}/g, " ").trim();
+  if (t.length > 80) t = t.slice(0, 77) + "...";
+  return t || raw;
+}
+
 function cleanTitle(raw) {
   if (!raw) return "";
   let t = raw;
@@ -2140,11 +2164,10 @@ function discBadge(bucket, fxMap) {
 function discBucket(m) {
   const explicit = ((m.discType || m.format || "")).toLowerCase().trim();
   if (["uhd","blu","blu3d","dvd","laser","vhs","hddvd","digital"].includes(explicit)) return explicit;
-  const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
-  const t = (m.title || "").toLowerCase();
-  if (/ultra|\buhd\b|\b4k\b/.test(d) || /\b4k\b|\buhd\b|ultra hd/.test(t)) return "uhd";
+  const d = ((m.discType || "") + " " + (m.edition || "") + " " + (m.title || "")).toLowerCase();
+  if (/ultra|\buhd\b|\b4k\b/.test(d)) return "uhd";
   if (/3d/.test(d) && /blu/.test(d)) return "blu3d";
-  if (/blu/.test(d)) return "blu";
+  if (/blu[- ]?ray|\bblu\b/.test(d)) return "blu";
   if (/laser/.test(d)) return "laser";
   if (/vhs/.test(d)) return "vhs";
   if (/hd.?dvd/.test(d)) return "hddvd";
@@ -2231,7 +2254,50 @@ function renderFilterChips() {
   });
 }
 
+
+function populateGenreYear() {
+  const genres = new Set();
+  const years = new Set();
+  getAll().forEach(m => {
+    (m.genres || "").split(/[,;]/).forEach(g => { const t = g.trim(); if (t) genres.add(t); });
+    const y = parseInt(m.year, 10);
+    if (y) years.add(y);
+  });
+  const gSel = $("filterGenre");
+  if (gSel) {
+    const cur = gSel.value;
+    gSel.innerHTML = '<option value="">All</option>' + [...genres].sort().map(g => '<option value="' + g + '">' + g + '</option>').join("");
+    if (cur) gSel.value = cur;
+  }
+  const ySel = $("filterYearExact");
+  if (ySel) {
+    const cur = ySel.value;
+    ySel.innerHTML = '<option value="">Any</option>' + [...years].sort((a,b)=>b-a).map(y => '<option value="' + y + '">' + y + '</option>').join("");
+    if (cur) ySel.value = cur;
+  }
+  const aGenres = new Set();
+  const aYears = new Set();
+  animeInv.forEach(i => {
+    (i.genres || "").split(/[,;]/).forEach(g => { const t = g.trim(); if (t) aGenres.add(t); });
+    const y = parseInt(i.year, 10);
+    if (y) aYears.add(y);
+  });
+  const ag = $("animeFilterGenre");
+  if (ag) {
+    const cur = ag.value;
+    ag.innerHTML = '<option value="">All</option>' + [...aGenres].sort().map(g => '<option value="' + g + '">' + g + '</option>').join("");
+    if (cur) ag.value = cur;
+  }
+  const ay = $("animeFilterYearExact");
+  if (ay) {
+    const cur = ay.value;
+    ay.innerHTML = '<option value="">Any</option>' + [...aYears].sort((a,b)=>b-a).map(y => '<option value="' + y + '">' + y + '</option>').join("");
+    if (cur) ay.value = cur;
+  }
+}
+
 function render() {
+  populateGenreYear();
   const q = norm($("q").value);
   let all = getAll();
   if (q) {
@@ -2248,20 +2314,15 @@ function render() {
   const disc = $("filterDisc") ? $("filterDisc").value : "";
   const bout = $("filterBout") ? $("filterBout").value : "";
   const homo = $("filterHomo") ? $("filterHomo").value : "";
-  const gen = ($("filterGenre") && $("filterGenre").value || "").toLowerCase();
-  const yr = $("filterYear") && $("filterYear").value;
+  const gen = $("filterGenre") && $("filterGenre").value;
+  const ymin = parseInt($("filterYearMin") && $("filterYearMin").value, 10) || 0;
+  const ymax = parseInt($("filterYearMax") && $("filterYearMax").value, 10) || 9999;
+  const yexact = parseInt($("filterYearExact") && $("filterYearExact").value, 10) || 0;
   const imdbMin = parseFloat($("filterImdb") && $("filterImdb").value) || 0;
   if (disc) all = all.filter(m => discBucket(m) === disc);
-  if (gen) all = all.filter(m => (m.genres||"").toLowerCase().includes(gen));
-  if (yr) {
-    const parts = yr.split("-").map(s => parseInt(s.trim(),10));
-    all = all.filter(m => {
-      const y = parseInt(m.year, 10);
-      if (!y) return false;
-      if (parts.length === 2) return y >= parts[0] && y <= parts[1];
-      return y === parts[0];
-    });
-  }
+  if (gen) all = all.filter(m => (m.genres||"").toLowerCase().includes(gen.toLowerCase()));
+  if (ymin || ymax < 9999) all = all.filter(m => { const y = parseInt(m.year,10); return y && y >= ymin && y <= ymax; });
+  if (yexact) all = all.filter(m => parseInt(m.year,10) === yexact);
   if (imdbMin) all = all.filter(m => parseFloat(m.publicRating) >= imdbMin);
   if (bout === "yes") all = all.filter(m => !!(boutiqueFlags[m.id] || m.boutiqueLabel));
   if (bout === "no") all = all.filter(m => !(boutiqueFlags[m.id] || m.boutiqueLabel));
@@ -2363,7 +2424,7 @@ function render() {
     return `<div class="card">
       ${cover}
       <div class="card-body">
-        <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${m.title}${friendTag}</div>
+        <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${displayTitle(m.title)}${friendTag}</div>
         <div class="card-meta">${m.year || ""}${discText}${m.edition ? " | " + m.edition : ""}</div>
         ${addedLine}
         <div class="card-flags">
@@ -3915,20 +3976,15 @@ function animeSetTheme(t){
 function animeRender(){
   const q = ($("animeSearch") && $("animeSearch").value || "").toLowerCase();
   const fmt = $("animeFilterFormat") && $("animeFilterFormat").value;
-  const gen = ($("animeFilterGenre") && $("animeFilterGenre").value || "").toLowerCase();
-  const yr = $("animeFilterYear") && $("animeFilterYear").value;
+  const gen = $("animeFilterGenre") && $("animeFilterGenre").value;
+  const ymin = parseInt($("animeFilterYearMin") && $("animeFilterYearMin").value, 10) || 0;
+  const ymax = parseInt($("animeFilterYearMax") && $("animeFilterYearMax").value, 10) || 9999;
+  const yexact = parseInt($("animeFilterYearExact") && $("animeFilterYearExact").value, 10) || 0;
   let list = animeInv.filter(i => (i.title||"").toLowerCase().includes(q));
   if (fmt) list = list.filter(i => (i.format||"").toLowerCase().includes(fmt.toLowerCase()));
-  if (gen) list = list.filter(i => (i.genres||"").toLowerCase().includes(gen));
-  if (yr) {
-    const parts = yr.split("-").map(s => parseInt(s.trim(),10));
-    list = list.filter(i => {
-      const y = parseInt(i.year, 10);
-      if (!y) return false;
-      if (parts.length === 2) return y >= parts[0] && y <= parts[1];
-      return y === parts[0];
-    });
-  }
+  if (gen) list = list.filter(i => (i.genres||"").toLowerCase().includes(gen.toLowerCase()));
+  if (ymin || ymax < 9999) list = list.filter(i => { const y = parseInt(i.year,10); return y && y >= ymin && y <= ymax; });
+  if (yexact) list = list.filter(i => parseInt(i.year,10) === yexact);
   const grid = $("animeGrid");
   if (!grid) return;
   if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
@@ -3940,7 +3996,7 @@ function animeRender(){
     return `<div class="card">
       ${cover}
       <div class="card-body">
-        <div class="card-title" data-anime-id="${item.id}">${escWatch(item.title)}</div>
+        <div class="card-title" data-anime-id="${item.id}">${escWatch(displayTitle(item.title))}</div>
         <div class="card-meta">${item.year||""}${item.format ? " · " + item.format : ""}</div>
         <div class="card-flags">
           ${badge}
@@ -4043,6 +4099,25 @@ if ($("animeFilterClear")) $("animeFilterClear").onclick = () => {
   if ($("animeFilterYear")) $("animeFilterYear").value = "";
   animeRender();
 };
+
+
+function wireLiveFilters() {
+  const main = ["filterDisc","filterGenre","filterYearMin","filterYearMax","filterYearExact","filterImdb","filterBout","filterHomo","filterGuide"];
+  main.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("change", () => render());
+    el.addEventListener("input", () => render());
+  });
+  const anime = ["animeFilterFormat","animeFilterGenre","animeFilterYearMin","animeFilterYearMax","animeFilterYearExact"];
+  anime.forEach(id => {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener("change", () => animeRender());
+    el.addEventListener("input", () => animeRender());
+  });
+}
+wireLiveFilters();
 
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
@@ -4249,10 +4324,14 @@ if (document.getElementById("shelfSave")) document.getElementById("shelfSave").o
 (function(){
   const btn = document.getElementById("backTop");
   if (!btn) return;
+  let lastY = window.scrollY;
   window.addEventListener("scroll", () => {
     const sec = document.querySelector(".section.active");
-    const show = window.scrollY > 300 && sec && (sec.id === "secInventory" || sec.id === "secAnime");
+    const y = window.scrollY;
+    const scrollingUp = y < lastY;
+    const show = y > 200 && scrollingUp && sec && (sec.id === "secInventory" || sec.id === "secAnime");
     btn.style.display = show ? "block" : "none";
+    lastY = y;
   });
   btn.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
 })();
