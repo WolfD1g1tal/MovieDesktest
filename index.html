@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.019</title>
+<title>Movie Desk 0.11.020</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.019</h1>
+  <h1>Movie Desk 0.11.020</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -4233,6 +4233,78 @@ function animeEnsure(item){
     }).catch(()=>{});
   }
 }
+
+const anilistDB = { name: "md_anilist", store: "cache" };
+function openAnilistDB() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(anilistDB.name, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(anilistDB.store);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+}
+async function anilistGet(key) {
+  try {
+    const db = await openAnilistDB();
+    return await new Promise((res, rej) => {
+      const tx = db.transaction(anilistDB.store, "readonly");
+      const r = tx.objectStore(anilistDB.store).get(key);
+      r.onsuccess = () => res(r.result);
+      r.onerror = () => rej(r.error);
+    });
+  } catch(e) { return null; }
+}
+async function anilistSet(key, val) {
+  try {
+    const db = await openAnilistDB();
+    await new Promise((res, rej) => {
+      const tx = db.transaction(anilistDB.store, "readwrite");
+      tx.objectStore(anilistDB.store).put(val, key);
+      tx.oncomplete = () => res();
+      tx.onerror = () => rej(tx.error);
+    });
+  } catch(e) {}
+}
+async function anilistSearch(q) {
+  const key = "search:" + q.toLowerCase();
+  const cached = await anilistGet(key);
+  if (cached && Date.now() - cached.t < 86400000) return cached.data;
+  const query = `query ($search: String) { Page(page:1, perPage:8) { media(search:$search, type:ANIME) { id title { romaji english } coverImage { medium } } } }`;
+  try {
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ query, variables: { search: q } })
+    });
+    const data = await res.json();
+    const list = (data.data && data.data.Page && data.data.Page.media) || [];
+    await anilistSet(key, { t: Date.now(), data: list });
+    return list;
+  } catch(e) { return []; }
+}
+let anilistTimer = 0;
+async function animeSuggest(q) {
+  const box = $("animeSuggest");
+  if (!box || !q || q.length < 2) { if (box) box.innerHTML = ""; return; }
+  clearTimeout(anilistTimer);
+  anilistTimer = setTimeout(async () => {
+    const list = await anilistSearch(q);
+    if (!box) return;
+    box.innerHTML = list.map(m => {
+      const title = (m.title && (m.title.english || m.title.romaji)) || "";
+      const cover = (m.coverImage && m.coverImage.medium) || "";
+      return '<div data-anilist-id="' + m.id + '" data-title="' + title.replace(/"/g, """) + '" data-cover="' + cover + '" style="padding:8px;cursor:pointer;border-bottom:1px solid #333">' + title + '</div>';
+    }).join("");
+    box.querySelectorAll("[data-anilist-id]").forEach(el => {
+      el.onclick = () => {
+        const input = $("animeTitleInput");
+        if (input) input.value = el.dataset.title;
+        box.innerHTML = "";
+      };
+    });
+  }, 300);
+}
+
 function animeOpenAdd(){
   const input = $("animeTitleInput");
   const title = (input && input.value || "").trim();
@@ -4273,7 +4345,7 @@ function wireLiveFilters() {
 }
 wireLiveFilters();
 
-if ($("animeTitleInput")) $("animeTitleInput").oninput = () => queueSuggest($("animeTitleInput").value, $("animeSuggest"));
+if ($("animeTitleInput")) $("animeTitleInput").oninput = () => animeSuggest($("animeTitleInput").value);
 if ($("animeScanBtn")) $("animeScanBtn").onclick = () => startScan("anime");
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
