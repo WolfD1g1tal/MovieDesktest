@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.017</title>
+<title>Movie Desk 0.11.019</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.017</h1>
+  <h1>Movie Desk 0.11.019</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2110,7 +2110,7 @@ function setCover(id, url) {
 }
 
 function badgeFxMap() {
-  const base = { uhd: "polish", blu: "polish", dvd: "polish" };
+  const base = { uhd: "shimmer", blu: "polish", dvd: "polish" };
   try { return Object.assign(base, JSON.parse(localStorage.getItem("md_badge_fx") || "{}")); }
   catch (e) { return base; }
 }
@@ -2131,8 +2131,10 @@ function discBadge(bucket, fxMap) {
       + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0%" stop-color="#fff6d4"/><stop offset="50%" stop-color="#c9a227"/><stop offset="100%" stop-color="#6e4e10"/>'
       + '</linearGradient>'
+      + '<filter id="' + gid + 's"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.5"/></filter>'
       + '</defs>'
-      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#3a2706" stroke-width="1"/>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#3a2706" stroke-width="1.5" filter="url(#' + gid + 's)"/>'
+      + '<rect x="6" y="6" width="108" height="20" rx="6" fill="rgba(255,255,255,0.25)"/>'
       + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
       + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="900" fill="url(#' + gid2 + ')">4K</text>'
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#3a2706" letter-spacing="1">ULTRA HD</text>'
@@ -2148,8 +2150,10 @@ function discBadge(bucket, fxMap) {
       + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0%" stop-color="#f7fbff"/><stop offset="50%" stop-color="#8ec4f2"/><stop offset="100%" stop-color="#1a6aaf"/>'
       + '</linearGradient>'
+      + '<filter id="' + gid + 's"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.5"/></filter>'
       + '</defs>'
-      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#082848" stroke-width="1"/>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#082848" stroke-width="1.5" filter="url(#' + gid + 's)"/>'
+      + '<rect x="6" y="6" width="108" height="20" rx="6" fill="rgba(255,255,255,0.2)"/>'
       + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
       + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="900" fill="url(#' + gid2 + ')">BLU</text>'
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#f4f9ff" letter-spacing="1">RAY</text>'
@@ -2165,8 +2169,10 @@ function discBadge(bucket, fxMap) {
       + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0%" stop-color="#ffffff"/><stop offset="50%" stop-color="#d8dee5"/><stop offset="100%" stop-color="#8e969e"/>'
       + '</linearGradient>'
+      + '<filter id="' + gid + 's"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.5"/></filter>'
       + '</defs>'
-      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#2c3136" stroke-width="1"/>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#2c3136" stroke-width="1.5" filter="url(#' + gid + 's)"/>'
+      + '<rect x="6" y="6" width="108" height="20" rx="6" fill="rgba(255,255,255,0.3)"/>'
       + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
       + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="900" fill="url(#' + gid2 + ')">DVD</text>'
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#2c3136" letter-spacing="1">VIDEO</text>'
