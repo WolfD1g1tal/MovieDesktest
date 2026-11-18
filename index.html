@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.010</title>
+<title>Movie Desk 0.11.011</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.010</h1>
+  <h1>Movie Desk 0.11.011</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -612,6 +612,10 @@
 <div class="modal" id="editPanel">
   <div class="modal-box" style="text-align:left;max-height:80vh;overflow:auto">
     <p id="editTitle" style="font-weight:600;margin:0 0 8px"></p>
+    <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
+      <div id="editCoverThumb" style="width:60px;height:90px;background:#222 center/cover no-repeat;border-radius:4px"></div>
+      <button type="button" id="editImageBtn" style="height:32px;padding:0 10px;font-size:0.8rem">Edit image</button>
+    </div>
     <label style="display:block;margin:6px 0">Source<br><input type="text" id="editSource" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">EAN / Barcode<br><input type="text" id="editEan" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">IMDb ID<br><input type="text" id="editImdbId" style="width:100%;height:36px"></label>
@@ -2643,6 +2647,8 @@ function bindInventoryClicks() {
       render();
       return;
     }
+    const cover = e.target.closest && e.target.closest("[data-pick]");
+    if (cover) { openEdit(cover.dataset.pick); return; }
     const title = e.target.closest && e.target.closest(".card-title[data-id]");
     if (title && !e.target.closest("select")) {
       const id = title.dataset.id || "";
@@ -2685,7 +2691,14 @@ function openEdit(id) {
   $("editSs").checked = !!homoFlags[key];
   $("editPanel").dataset.id = id;
   $("editPanel").classList.add("show");
+  const thumb = $("editCoverThumb");
+  if (thumb) thumb.style.backgroundImage = m.coverUrl ? "url(" + JSON.stringify(m.coverUrl) + ")" : "none";
 }
+$("editPanel").onclick = (e) => { if (e.target === $("editPanel")) $("editPanel").classList.remove("show"); };
+if ($("editImageBtn")) $("editImageBtn").onclick = () => {
+  const id = $("editPanel").dataset.id;
+  if (id) pickCover(id);
+};
 $("editSave").onclick = () => {
   const id = $("editPanel").dataset.id;
   const m = getById(id);
