@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.10.011</title>
+<title>Movie Desk 0.11.001</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -100,11 +100,22 @@
   .fx-pick { height: auto; display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 8px 10px; background: #141414; border-radius: 10px; }
   .fx-pick.on { border-color: #c9a227; background: #1c1a14; }
   .fx-name { font-size: 0.85rem; line-height: 1.25; }
+
+  .bottom-nav { position: fixed; bottom: 0; left: 0; right: 0; background: #161616; border-top: 1px solid #333; display: flex; z-index: 50; }
+  .bottom-nav button { flex: 1; height: 48px; background: none; border: none; color: #aaa; font-size: 0.7rem; }
+  .bottom-nav button.on { color: #8ab4f8; }
+  body { padding-bottom: 56px; }
+  .disc-badge { border-radius: 6px; }
+
+  @media (min-width: 900px) {
+    #out, #animeGrid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+    .bottom-nav { max-width: 800px; left: 50%; transform: translateX(-50%); border-radius: 12px 12px 0 0; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.10.011</h1>
+  <h1>Movie Desk 0.11.001</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -1359,6 +1370,11 @@ function makeChild(title, motherId, extra={}){
 function displayTitle(raw) {
   if (!raw) return "";
   let t = String(raw);
+  if (/^;+/.test(t) || /ITEM_GROUP|tt\d{7,}|cloud:\/\//.test(t)) {
+    const parts = t.split(/;+/).filter(Boolean);
+    const candidate = parts.find(p => p.length > 2 && !/^\d+$/.test(p) && !/^tt\d+/.test(p) && !/^https?:/.test(p) && !/^cloud:/.test(p) && !/ITEM_GROUP/.test(p));
+    t = candidate || "";
+  }
   t = t.replace(/\s*[\(\[].{0,40}[\)\]]/g, " ");
   t = t.replace(/\s*[-–—]\s*(Blu[- ]?ray|DVD|4K|UHD|Steelbook|Slipcover|Combo|Disc).*$/i, "");
   t = t.replace(/\s*\+\s*W\/.*$/i, "");
@@ -2319,8 +2335,27 @@ function mdCatch(name, fn) {
   };
 }
 
+
+function saveUiState() {
+  const state = {
+    disc: ($("filterDisc") && $("filterDisc").value) || "",
+    genre: ($("filterGenre") && $("filterGenre").value) || "",
+    sort: ($("sortSel") && $("sortSel").value) || "added-new"
+  };
+  localStorage.setItem("md_ui", JSON.stringify(state));
+}
+function loadUiState() {
+  try {
+    const s = JSON.parse(localStorage.getItem("md_ui") || "{}");
+    if ($("filterDisc") && s.disc) $("filterDisc").value = s.disc;
+    if ($("filterGenre") && s.genre) $("filterGenre").value = s.genre;
+    if ($("sortSel") && s.sort) $("sortSel").value = s.sort;
+  } catch(e) {}
+}
+
 function render() {
   try {
+  loadUiState();
   populateGenreYear();
   const q = norm($("q").value);
   let all = getAll();
@@ -2369,6 +2404,7 @@ function render() {
     : `${shown.length} shown / ${getAll().length} total`;
   const nFilt = activeFilterCount();
   renderFilterChips();
+  saveUiState();
   if ($("filterBtn")) {
     $("filterBtn").textContent = nFilt ? "Filter (" + nFilt + ")" : "Filter";
     $("filterBtn").classList.toggle("on", nFilt > 0);
@@ -4018,7 +4054,7 @@ function animeRender(){
   if (yexact > 0) list = list.filter(i => parseInt(i.year,10) === yexact);
   const grid = $("animeGrid");
   if (!grid) return;
-  if (!list.length){ grid.innerHTML = '<div class="empty">No anime titles yet.</div>'; return; }
+  if (!list.length){ grid.innerHTML = '<div class="empty" style="text-align:center;color:#777;padding:40px">No anime titles yet.</div>'; return; }
   grid.innerHTML = list.map(item => {
     const cover = item.cover ? `<img class="card-cover" data-anime-pick="${item.id}" src="${item.cover}" alt="" loading="lazy" style="cursor:pointer">` : `<div class="card-cover" data-anime-pick="${item.id}" style="cursor:pointer;display:flex;align-items:center;justify-content:center;color:#555;font-size:0.75rem">cover</div>`;
     const badge = discBadge(discBucket({discType:item.format||"", title:item.title}), {});
@@ -4347,6 +4383,15 @@ window.onerror = function(msg, src, line, col, err) {
   box.style.display = "block";
   return false;
 };
+
+document.querySelectorAll(".bottom-nav button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".bottom-nav button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    showSection(btn.dataset.nav);
+  };
+});
+
 </script>
 
 
@@ -4380,6 +4425,16 @@ window.onerror = function(msg, src, line, col, err) {
   btn.onclick = () => window.scrollTo({ top: 0, behavior: "smooth" });
 })();
 </script>
+
+
+<nav class="bottom-nav">
+  <button type="button" data-nav="inventory" class="on">Inventory</button>
+  <button type="button" data-nav="anime">Anime</button>
+  <button type="button" data-nav="add">Add</button>
+  <button type="button" data-nav="watch">Watch</button>
+  <button type="button" data-nav="stream">Stream</button>
+  <button type="button" data-nav="settings">Settings</button>
+</nav>
 
 </body>
 </html>
