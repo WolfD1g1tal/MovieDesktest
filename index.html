@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.014</title>
+<title>Movie Desk 0.11.017</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.014</h1>
+  <h1>Movie Desk 0.11.017</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -498,8 +498,8 @@
         <option value="Sea Adventure">Sea Adventure</option>
         <option value="Seinen">Seinen</option>
         <option value="Serial Killer">Serial Killer</option>
-        <option value="Shojo">Shojo</option>
-        <option value="Shonen">Shonen</option>
+        <option value="Shōjo">Shōjo</option>
+        <option value="Shōnen">Shōnen</option>
         <option value="Showbiz Drama">Showbiz Drama</option>
         <option value="Sitcom">Sitcom</option>
         <option value="Sketch Comedy">Sketch Comedy</option>
@@ -650,7 +650,7 @@
       <strong style="font-size:0.85rem">Tags</strong>
       <div id="editTags" style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0"></div>
       <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
-        <select id="tagSymbol" style="height:28px"><option>?</option><option>?</option><option>?</option><option>?</option><option>?</option><option>¦</option></select>
+        <select id="tagSymbol" style="height:28px;font-size:1.1rem"><option value="⭐">⭐</option><option value="❤️">❤️</option><option value="🔵">🔵</option><option value="🔶">🔶</option><option value="🔺">🔺</option><option value="⬛">⬛</option></select>
         <input id="tagColor" type="color" value="#6af" style="width:36px;height:28px;padding:0;border:none">
         <input id="tagName" placeholder="Tag name" style="flex:1;height:28px;background:#111;color:#eee;border:1px solid #333;border-radius:4px;padding:0 6px">
         <button type="button" id="tagAdd" style="height:28px;padding:0 8px;font-size:0.75rem">Add</button>
@@ -659,6 +659,10 @@
     <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
       <input type="checkbox" id="editSs">
       <span>ss</span>
+    </label>
+    <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
+      <input type="checkbox" id="editGuide">
+      <span>Parents Guide</span>
     </label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="editSave">Save</button>
@@ -673,7 +677,7 @@
   <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:420px;width:100%;max-height:90vh;overflow:auto">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <strong>Shelf Snapshot</strong>
-      <button type="button" id="shelfClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button>
+      <button type="button" id="shelfClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">✕</button>
     </div>
     <div class="form-row"><label>Shelf name</label><input id="shelfName" type="text" placeholder="e.g. Horror A1"></div>
     <div class="form-row"><label>Whole shelf photo</label><input id="shelfWhole" type="file" accept="image/*" capture="environment"></div>
@@ -2044,7 +2048,7 @@ function openCropper(url, id) {
   const box = document.getElementById("coverPicker");
   const panel = document.getElementById("coverPanel");
   if (!panel) return;
-  panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>Crop cover</span><button type="button" id="cropCancel" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button></div><canvas id="cropCanvas" style="width:100%;max-height:60vh;background:#111;border-radius:8px;touch-action:none"></canvas><p style="font-size:0.8rem;color:#888;margin:6px 0">Drag to select crop area</p><div style="display:flex;gap:8px"><button id="cropApply" type="button" style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use crop</button><button id="cropSkip" type="button" style="flex:1;height:40px;background:#222;color:#aaa;border:none;border-radius:8px">Use original</button></div>';
+  panel.innerHTML = '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px"><span>Crop cover</span><button type="button" id="cropCancel" style="background:none;border:none;color:#aaa;font-size:1.2rem">✕</button></div><canvas id="cropCanvas" style="width:100%;max-height:60vh;background:#111;border-radius:8px;touch-action:none"></canvas><p style="font-size:0.8rem;color:#888;margin:6px 0">Drag to select crop area</p><div style="display:flex;gap:8px"><button id="cropApply" type="button" style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use crop</button><button id="cropSkip" type="button" style="flex:1;height:40px;background:#222;color:#aaa;border:none;border-radius:8px">Use original</button></div>';
   const canvas = document.getElementById("cropCanvas");
   const ctx = canvas.getContext("2d");
   const img = new Image();
@@ -2725,6 +2729,7 @@ function openEdit(id) {
   renderEditTags(m);
   const key = homoKey(m);
   $("editSs").checked = !!homoFlags[key];
+  if ($("editGuide")) $("editGuide").checked = !!guideFlags[key];
   $("editPanel").dataset.id = id;
   $("editPanel").classList.add("show");
   const thumb = $("editCoverThumb");
@@ -3545,8 +3550,8 @@ async function loadStreamCache() {
   try { streamCache = await idbGetAll("stream") || {}; }
   catch (e) { streamCache = {}; }
 }
-const WATCHMODE_KEY = localStorage.getItem("md_watchmode_key") || "";
-const STREAMAVAIL_KEY = localStorage.getItem("md_streamavail_key") || "";
+const WATCHMODE_KEY = "pGyKylkUhs6TU2hzpE9P1oky9KXqgXaQ6dAQOQv8";
+const STREAMAVAIL_KEY = "motn-key-v4-wgVVvaB6rcc36QRCUJnIG9yXFqKYS3FG";
 const ATTRIBUTIONS = {
   watchmode: "Data from Watchmode",
   tmdb: "Powered by JustWatch",
@@ -4280,7 +4285,7 @@ function animeOpenDetail(id){
     <div style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:14px;max-width:480px;width:100%;max-height:90vh;overflow:auto">
       <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
         <strong>${escWatch(item.title)}</strong>
-        <button type="button" id="animeDetClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">?</button>
+        <button type="button" id="animeDetClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">✕</button>
       </div>
       <div style="display:flex;gap:10px;margin-bottom:10px">
         <div id="animeCoverBox" style="width:100px;height:150px;background:#222 center/cover no-repeat;border-radius:6px;cursor:pointer" title="Pick cover"></div>
@@ -4336,7 +4341,7 @@ function animePickCover(id){
   selectedCoverUrl = null;
   const box = document.getElementById("coverPicker");
   if (!box) return;
-  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px">?</button></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + escWatch(item.title) + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button></div></div>';
+  box.innerHTML = '<div id="coverPanel" style="background:#1a1a1a;border:1px solid #333;border-radius:12px;padding:12px;max-width:440px;width:94%;max-height:85vh;display:flex;flex-direction:column"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px"><span style="font-weight:600">Pick cover</span><button type="button" id="coverCancel" style="background:none;border:none;color:#aaa;cursor:pointer;padding:4px">✕</button></div><p style="margin:0 0 8px;font-size:0.85rem;color:#aaa">' + escWatch(item.title) + '</p><div id="coverThumbs" style="overflow-y:auto;max-height:50vh;display:flex;gap:8px;flex-wrap:wrap;padding:4px 0"></div><div style="margin-top:10px;display:flex;gap:8px"><input id="coverPaste" placeholder="or paste image URL" style="flex:1;height:36px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:0 8px"><button id="coverAddUrl" type="button" style="height:36px;background:#333;color:#fff;border:none;border-radius:6px;padding:0 12px">Add</button></div><div style="display:flex;gap:8px;margin-top:10px"><button id="coverUseSel" type="button" disabled style="flex:1;height:40px;background:#333;color:#fff;border:none;border-radius:8px">Use selected</button></div></div>';
   box.style.display = "flex";
   const thumbs = document.getElementById("coverThumbs");
   thumbs.innerHTML = '<span style="color:#888">Loading covers...</span>';
