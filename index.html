@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.009</title>
+<title>Movie Desk 0.11.010</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -127,11 +127,14 @@
   @media (min-width: 900px) {
     #filterPanel.open { position: fixed; top: 60px; right: 16px; width: 280px; max-height: 70vh; overflow: auto; background: #1a1a1a; border: 1px solid #333; border-radius: 12px; padding: 12px; z-index: 40; box-shadow: 0 4px 16px rgba(0,0,0,.5); }
   }
+
+  .card:hover { border-color: #444; }
+  .card-title:hover { color: #8ab4f8; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.009</h1>
+  <h1>Movie Desk 0.11.010</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -4421,6 +4424,14 @@ document.querySelectorAll(".desktop-nav button").forEach(btn => {
     if (match) match.classList.add("on");
     showSection(btn.dataset.nav);
   };
+});
+
+
+document.addEventListener("keydown", (e) => {
+  if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return;
+  const map = { "1": "inventory", "2": "anime", "3": "add", "4": "watch", "5": "stream", "6": "settings" };
+  if (map[e.key]) { showSection(map[e.key]); e.preventDefault(); }
+  if (e.key === "/") { const q = document.getElementById("q"); if (q) { q.focus(); e.preventDefault(); } }
 });
 
 </script>
