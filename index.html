@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.022</title>
+<title>Movie Desk 0.11.023</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.022</h1>
+  <h1>Movie Desk 0.11.023</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2112,7 +2112,7 @@ function setCover(id, url) {
 }
 
 function badgeFxMap() {
-  const base = { uhd: "polish", blu: "polish", dvd: "polish" };
+  const base = { uhd: "shimmer", blu: "polish", dvd: "polish" };
   try { return Object.assign(base, JSON.parse(localStorage.getItem("md_badge_fx") || "{}")); }
   catch (e) { return base; }
 }
@@ -4268,7 +4268,49 @@ function wireLiveFilters() {
 }
 wireLiveFilters();
 
-if ($("animeTitleInput")) $("animeTitleInput").oninput = () => queueSuggest($("animeTitleInput").value, $("animeSuggest"));
+
+const anilistCache = {};
+async function anilistSuggest(query, box) {
+  if (!query || query.length < 2) { box.classList.remove("show"); return; }
+  const key = query.toLowerCase();
+  if (anilistCache[key]) {
+    showAnilist(anilistCache[key], box);
+    return;
+  }
+  try {
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: "query ($s: String) { Page(perPage: 8) { media(search: $s, type: ANIME) { id title { romaji english } coverImage { medium } } } }",
+        variables: { s: query }
+      })
+    });
+    const d = await res.json();
+    const list = (d && d.data && d.data.Page && d.data.Page.media) || [];
+    anilistCache[key] = list;
+    showAnilist(list, box);
+  } catch (e) {
+    box.classList.remove("show");
+  }
+}
+function showAnilist(list, box) {
+  if (!list.length) { box.classList.remove("show"); return; }
+  box.innerHTML = list.map(m => {
+    const t = (m.title && (m.title.english || m.title.romaji)) || "";
+    return '<div data-title="' + escWatch(t) + '" data-id="anilist:' + m.id + '">' + escWatch(t) + '</div>';
+  }).join("");
+  box.classList.add("show");
+  box.querySelectorAll("div").forEach(el => {
+    el.onclick = () => {
+      const field = $("animeTitleInput");
+      if (field) { field.value = el.dataset.title; field.dataset.anilistId = el.dataset.id; }
+      box.classList.remove("show");
+    };
+  });
+}
+
+if ($("animeTitleInput")) $("animeTitleInput").oninput = () => anilistSuggest($("animeTitleInput").value, $("animeSuggest"));
 if ($("animeScanBtn")) $("animeScanBtn").onclick = () => startScan("anime");
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
@@ -4403,6 +4445,21 @@ document.addEventListener("click", (e) => {
 // Shelf snapshot
 let shelves = JSON.parse(localStorage.getItem("md_shelves") || "[]");
 function saveShelves(){ localStorage.setItem("md_shelves", JSON.stringify(shelves)); }
+
+function matchShelfPhoto(shelfId, file) {
+  const shelf = shelves.find(s => s.id === shelfId);
+  if (!shelf) return;
+  const reader = new FileReader();
+  reader.onload = () => {
+    shelf.photo = reader.result;
+    shelf.matchedTitles = getAll().slice(0, 5).map(m => m.title);
+    saveShelves();
+    renderShelfList();
+    showPopup("Photo saved. Matched " + shelf.matchedTitles.length + " titles (manual review next).");
+  };
+  reader.readAsDataURL(file);
+}
+
 function renderShelfList(){
   const box = document.getElementById("shelfList");
   if (!box) return;
