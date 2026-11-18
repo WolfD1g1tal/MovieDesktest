@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.012</title>
+<title>Movie Desk 0.11.013</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.012</h1>
+  <h1>Movie Desk 0.11.013</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2216,16 +2216,6 @@ function discBadge(bucket, fxMap) {
 function discBucket(m) {
   const explicit = ((m.discType || m.format || "")).toLowerCase().trim();
   if (["uhd","blu","blu3d","dvd","laser","vhs","hddvd","digital"].includes(explicit)) return explicit;
-  if (!explicit || explicit === "auto" || explicit === "other") return "dvd";
-  const d = ((m.discType || "") + " " + (m.edition || "")).toLowerCase();
-  if (/ultra\s*hd|\buhd\b|\b4k\b/.test(d)) return "uhd";
-  if (/3d/.test(d) && /blu/.test(d)) return "blu3d";
-  if (/blu[- ]?ray|\bblu\b/.test(d)) return "blu";
-  if (/laser/.test(d)) return "laser";
-  if (/vhs/.test(d)) return "vhs";
-  if (/hd.?dvd/.test(d)) return "hddvd";
-  if (/\bdvd\b/.test(d)) return "dvd";
-  if (/digital/.test(d)) return "digital";
   return "dvd";
 }
 function numRating(v) {
@@ -2302,7 +2292,7 @@ function renderFilterChips() {
       if (k === "bout" && $("filterBout")) $("filterBout").value = "";
       if (k === "homo" && $("filterHomo")) $("filterHomo").value = "";
       if (k === "guide" && $("filterGuide")) $("filterGuide").value = "";
-      render();
+      if (typeof saveFilter === "function") saveFilter(); else render();
     };
   });
 }
@@ -4075,6 +4065,11 @@ $("q").oninput = () => { clearTimeout(invRenderTimer); invRenderTimer = setTimeo
     $("filterBout").value = "";
     $("filterHomo").value = "";
     $("filterGuide").value = "";
+    if ($("filterGenre")) $("filterGenre").value = "";
+    if ($("filterYearMin")) $("filterYearMin").value = "";
+    if ($("filterYearMax")) $("filterYearMax").value = "";
+    if ($("filterYearExact")) $("filterYearExact").value = "";
+    if ($("filterImdb")) $("filterImdb").value = "";
     saveFilter();
   };
   render();
