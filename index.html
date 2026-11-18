@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.011</title>
+<title>Movie Desk 0.11.012</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.011</h1>
+  <h1>Movie Desk 0.11.012</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -644,7 +644,18 @@
     <label style="display:block;margin:6px 0">Composer<br><input type="text" id="editComposer" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Cinematographer<br><input type="text" id="editCinematographer" style="width:100%;height:36px"></label>
     <label style="display:block;margin:6px 0">Cover URL<br><input type="text" id="editCoverUrl" style="width:100%;height:36px"></label>
-    <label style="display:block;margin:6px 0">Notes<br><input type="text" id="editNotes" style="width:100%;height:36px"></label>
+    <label style="display:block;margin:6px 0">Summary<br><textarea id="editSummary" style="width:100%;height:60px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:6px"></textarea></label>
+    <label style="display:block;margin:6px 0">Notes<br><textarea id="editNotes" style="width:100%;height:50px;background:#111;color:#eee;border:1px solid #333;border-radius:6px;padding:6px"></textarea></label>
+    <div style="margin:8px 0">
+      <strong style="font-size:0.85rem">Tags</strong>
+      <div id="editTags" style="display:flex;flex-wrap:wrap;gap:4px;margin:4px 0"></div>
+      <div style="display:flex;gap:4px;flex-wrap:wrap;align-items:center">
+        <select id="tagSymbol" style="height:28px"><option>?</option><option>?</option><option>?</option><option>?</option><option>?</option><option>¦</option></select>
+        <input id="tagColor" type="color" value="#6af" style="width:36px;height:28px;padding:0;border:none">
+        <input id="tagName" placeholder="Tag name" style="flex:1;height:28px;background:#111;color:#eee;border:1px solid #333;border-radius:4px;padding:0 6px">
+        <button type="button" id="tagAdd" style="height:28px;padding:0 8px;font-size:0.75rem">Add</button>
+      </div>
+    </div>
     <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
       <input type="checkbox" id="editSs">
       <span>ss</span>
@@ -2528,6 +2539,7 @@ function render() {
           <span class="flag ${guideFlags[key]?"guide-yes":"guide-no"}" data-guide="${key}">Guide: ${guideFlags[key]?"yes":"no"}</span>
           <span class="flag imdb" title="${m.ratingStatus === "no-id" ? "No IMDb ID in collection" : (m.ratingStatus === "no-match" ? "No matching rating found" : "")}">IMDb: ${m.publicRating||"-"}</span>
           ${ratingBadge(m)}
+          ${(m.tags||[]).map(t => '<span class="flag" style="background:' + (t.color||"#333") + ';color:#fff">' + (t.symbol||"") + " " + escWatch(t.name||"") + '</span>').join("")}
         </div>
         ${ssOnCard() ? `<div class="card-ss" style="margin-top:6px;"><span class="flag ${isYes?"gay-yes":"gay-no"}" data-key="${key}">ss: ${isYes?"yes":"no"}</span></div>` : ""}
         <div style="margin-top:8px;text-align:right"><button type="button" class="del-card" data-del="${m.id||""}" style="background:none;border:none;color:#c66;font-size:0.8rem;padding:2px 6px;cursor:pointer">Delete</button></div>
@@ -2581,8 +2593,6 @@ function bindInventoryClicks() {
       };
       return;
     }
-    const pick = e.target.closest && e.target.closest("[data-pick]");
-    if (pick) { pickCover(pick.dataset.pick); return; }
     const homo = e.target.closest && e.target.closest(".flag[data-key]");
     if (homo) {
       const k = homo.dataset.key;
@@ -2666,6 +2676,32 @@ function bindInventoryClicks() {
 }
 bindInventoryClicks();
 
+
+function renderEditTags(m) {
+  const box = $("editTags");
+  if (!box) return;
+  const tags = m.tags || [];
+  box.innerHTML = tags.map((t, i) => '<span style="display:inline-flex;align-items:center;gap:4px;background:' + (t.color||"#333") + ';color:#fff;padding:2px 8px;border-radius:12px;font-size:0.75rem">' + (t.symbol||"") + " " + escWatch(t.name||"") + ' <button type="button" data-tag-rm="' + i + '" style="background:none;border:none;color:#fff;cursor:pointer">×</button></span>').join("");
+  box.querySelectorAll("[data-tag-rm]").forEach(btn => {
+    btn.onclick = () => {
+      const idx = parseInt(btn.dataset.tagRm, 10);
+      m.tags.splice(idx, 1);
+      renderEditTags(m);
+    };
+  });
+}
+if ($("tagAdd")) $("tagAdd").onclick = () => {
+  const id = $("editPanel").dataset.id;
+  const m = getById(id);
+  if (!m) return;
+  const name = ($("tagName").value || "").trim();
+  if (!name) return;
+  m.tags = m.tags || [];
+  m.tags.push({ symbol: $("tagSymbol").value, color: $("tagColor").value, name: name });
+  $("tagName").value = "";
+  renderEditTags(m);
+};
+
 function openEdit(id) {
   const m = getById(id);
   if (!m) return;
@@ -2687,6 +2723,9 @@ function openEdit(id) {
   $("editCinematographer").value = m.cinematographer || "";
   $("editNotes").value = m.notes || "";
   $("editCoverUrl").value = m.coverUrl || "";
+  if ($("editSummary")) $("editSummary").value = m.summary || "";
+  if ($("editNotes")) $("editNotes").value = m.notes || "";
+  renderEditTags(m);
   const key = homoKey(m);
   $("editSs").checked = !!homoFlags[key];
   $("editPanel").dataset.id = id;
@@ -2719,6 +2758,7 @@ $("editSave").onclick = () => {
   m.director = ($("editDirector").value || "").trim();
   m.composer = ($("editComposer").value || "").trim();
   m.cinematographer = ($("editCinematographer").value || "").trim();
+  m.summary = ($("editSummary") && $("editSummary").value || "").trim();
   m.notes = ($("editNotes").value || "").trim();
   m.coverUrl = ($("editCoverUrl").value || "").trim();
   const key = homoKey(m);
@@ -4339,7 +4379,7 @@ document.addEventListener("click", (e) => {
     return;
   }
   const pick = e.target.closest && e.target.closest("[data-anime-pick]");
-  if (pick) { animePickCover(pick.dataset.animePick); return; }
+  if (pick) { animeOpenDetail(pick.dataset.animePick); return; }
   const del = e.target.closest && e.target.closest("[data-anime-del]");
   if (del) {
     const id = del.dataset.animeDel;
