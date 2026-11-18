@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.001</title>
+<title>Movie Desk 0.11.002</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -115,7 +115,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.001</h1>
+  <h1>Movie Desk 0.11.002</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -147,7 +147,9 @@
     <div class="add-wrap" style="margin-bottom:12px">
       <div class="add-row">
         <input type="text" id="animeTitleInput" placeholder="Anime title..." autocomplete="off">
+        <button id="animeScanBtn">Scan</button>
         <button id="animeAddBtn">Add Anime</button>
+        <div id="animeSuggest" class="suggest"></div>
       </div>
     </div>
     <div class="tool-row" style="margin-bottom:6px">
@@ -2349,7 +2351,6 @@ function loadUiState() {
     const s = JSON.parse(localStorage.getItem("md_ui") || "{}");
     if ($("filterDisc") && s.disc) $("filterDisc").value = s.disc;
     if ($("filterGenre") && s.genre) $("filterGenre").value = s.genre;
-    if ($("sortSel") && s.sort) $("sortSel").value = s.sort;
   } catch(e) {}
 }
 
@@ -4186,6 +4187,8 @@ function wireLiveFilters() {
 }
 wireLiveFilters();
 
+if ($("animeTitleInput")) $("animeTitleInput").oninput = () => queueSuggest($("animeTitleInput").value, $("animeSuggest"));
+if ($("animeScanBtn")) $("animeScanBtn").onclick = () => startScan("anime");
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
   const item = animeInv.find(i => String(i.id) === String(id));
