@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.023</title>
+<title>Movie Desk 0.11.024</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.023</h1>
+  <h1>Movie Desk 0.11.024</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -678,7 +678,12 @@
       <button type="button" id="shelfClose" style="background:none;border:none;color:#aaa;font-size:1.2rem">✕</button>
     </div>
     <div class="form-row"><label>Shelf name</label><input id="shelfName" type="text" placeholder="e.g. Horror A1"></div>
-    <div class="form-row"><label>Whole shelf photo</label><input id="shelfWhole" type="file" accept="image/*" capture="environment"></div>
+    <div class="form-row">
+      <label>Whole shelf photo</label>
+      <button type="button" id="shelfWholeBtn" style="height:36px;width:100%;background:#222;border:1px solid #444;border-radius:8px;color:#eee">Take whole shelf photo</button>
+      <input id="shelfWhole" type="file" accept="image/*" capture="environment" style="display:none">
+      <div id="shelfWholePreview" style="margin-top:6px;font-size:0.75rem;color:#8ab4f8"></div>
+    </div>
     <div class="form-row"><label>Number of sections</label><input id="shelfSections" type="number" min="1" max="20" value="3"></div>
     <div id="shelfSectionInputs"></div>
     <div style="display:flex;gap:8px;margin-top:10px">
@@ -2112,7 +2117,7 @@ function setCover(id, url) {
 }
 
 function badgeFxMap() {
-  const base = { uhd: "shimmer", blu: "polish", dvd: "polish" };
+  const base = { uhd: "polish", blu: "polish", dvd: "polish" };
   try { return Object.assign(base, JSON.parse(localStorage.getItem("md_badge_fx") || "{}")); }
   catch (e) { return base; }
 }
@@ -4268,49 +4273,7 @@ function wireLiveFilters() {
 }
 wireLiveFilters();
 
-
-const anilistCache = {};
-async function anilistSuggest(query, box) {
-  if (!query || query.length < 2) { box.classList.remove("show"); return; }
-  const key = query.toLowerCase();
-  if (anilistCache[key]) {
-    showAnilist(anilistCache[key], box);
-    return;
-  }
-  try {
-    const res = await fetch("https://graphql.anilist.co", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        query: "query ($s: String) { Page(perPage: 8) { media(search: $s, type: ANIME) { id title { romaji english } coverImage { medium } } } }",
-        variables: { s: query }
-      })
-    });
-    const d = await res.json();
-    const list = (d && d.data && d.data.Page && d.data.Page.media) || [];
-    anilistCache[key] = list;
-    showAnilist(list, box);
-  } catch (e) {
-    box.classList.remove("show");
-  }
-}
-function showAnilist(list, box) {
-  if (!list.length) { box.classList.remove("show"); return; }
-  box.innerHTML = list.map(m => {
-    const t = (m.title && (m.title.english || m.title.romaji)) || "";
-    return '<div data-title="' + escWatch(t) + '" data-id="anilist:' + m.id + '">' + escWatch(t) + '</div>';
-  }).join("");
-  box.classList.add("show");
-  box.querySelectorAll("div").forEach(el => {
-    el.onclick = () => {
-      const field = $("animeTitleInput");
-      if (field) { field.value = el.dataset.title; field.dataset.anilistId = el.dataset.id; }
-      box.classList.remove("show");
-    };
-  });
-}
-
-if ($("animeTitleInput")) $("animeTitleInput").oninput = () => anilistSuggest($("animeTitleInput").value, $("animeSuggest"));
+if ($("animeTitleInput")) $("animeTitleInput").oninput = () => queueSuggest($("animeTitleInput").value, $("animeSuggest"));
 if ($("animeScanBtn")) $("animeScanBtn").onclick = () => startScan("anime");
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
@@ -4445,21 +4408,6 @@ document.addEventListener("click", (e) => {
 // Shelf snapshot
 let shelves = JSON.parse(localStorage.getItem("md_shelves") || "[]");
 function saveShelves(){ localStorage.setItem("md_shelves", JSON.stringify(shelves)); }
-
-function matchShelfPhoto(shelfId, file) {
-  const shelf = shelves.find(s => s.id === shelfId);
-  if (!shelf) return;
-  const reader = new FileReader();
-  reader.onload = () => {
-    shelf.photo = reader.result;
-    shelf.matchedTitles = getAll().slice(0, 5).map(m => m.title);
-    saveShelves();
-    renderShelfList();
-    showPopup("Photo saved. Matched " + shelf.matchedTitles.length + " titles (manual review next).");
-  };
-  reader.readAsDataURL(file);
-}
-
 function renderShelfList(){
   const box = document.getElementById("shelfList");
   if (!box) return;
@@ -4476,11 +4424,23 @@ function buildSectionInputs(){
   for (let i = 1; i <= n; i++) {
     const d = document.createElement("div");
     d.className = "form-row";
-    d.innerHTML = '<label>Section '+i+' photo</label><input type="file" accept="image/*" capture="environment" data-sec="'+i+'">';
+    d.innerHTML = '<label>Section '+i+'</label><button type="button" class="sec-photo-btn" data-sec="'+i+'" style="height:32px;width:100%;background:#222;border:1px solid #444;border-radius:8px;color:#eee">Take section '+i+' photo</button><input type="file" accept="image/*" capture="environment" data-sec="'+i+'" style="display:none"><div class="sec-prev" data-sec="'+i+'" style="font-size:0.75rem;color:#8ab4f8;margin-top:2px"></div>';
     box.appendChild(d);
+    const btn = d.querySelector(".sec-photo-btn");
+    const inp = d.querySelector("input[type=file]");
+    const prev = d.querySelector(".sec-prev");
+    btn.onclick = () => inp.click();
+    inp.onchange = () => { if (inp.files && inp.files[0]) prev.textContent = "Photo ready: " + inp.files[0].name; };
   }
 }
 if (document.getElementById("shelfBtn")) document.getElementById("shelfBtn").onclick = openShelf;
+if (document.getElementById("shelfWholeBtn")) {
+  document.getElementById("shelfWholeBtn").onclick = () => document.getElementById("shelfWhole").click();
+  document.getElementById("shelfWhole").onchange = () => {
+    const f = document.getElementById("shelfWhole").files && document.getElementById("shelfWhole").files[0];
+    if (f) document.getElementById("shelfWholePreview").textContent = "Photo ready: " + f.name;
+  };
+}
 if (document.getElementById("shelfClose")) document.getElementById("shelfClose").onclick = () => document.getElementById("shelfModal").style.display = "none";
 if (document.getElementById("shelfClose2")) document.getElementById("shelfClose2").onclick = () => document.getElementById("shelfModal").style.display = "none";
 if (document.getElementById("shelfSections")) document.getElementById("shelfSections").onchange = buildSectionInputs;
