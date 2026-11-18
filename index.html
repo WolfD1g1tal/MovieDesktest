@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.003</title>
+<title>Movie Desk 0.11.004</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -111,11 +111,20 @@
     #out, #animeGrid { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
     .bottom-nav { max-width: 800px; left: 50%; transform: translateX(-50%); border-radius: 12px 12px 0 0; }
   }
+
+  .desktop-nav { display: none; }
+  @media (min-width: 900px) {
+    .desktop-nav { display: flex; gap: 8px; padding: 8px 16px; background: #161616; border-bottom: 1px solid #333; }
+    .desktop-nav button { height: 36px; padding: 0 14px; background: #222; border: 1px solid #333; border-radius: 8px; color: #aaa; }
+    .desktop-nav button.on { color: #8ab4f8; border-color: #8ab4f8; }
+    .bottom-nav { display: none; }
+    body { padding-bottom: 0; }
+  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.003</h1>
+  <h1>Movie Desk 0.11.004</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -4396,6 +4405,17 @@ document.querySelectorAll(".bottom-nav button").forEach(btn => {
   };
 });
 
+
+document.querySelectorAll(".desktop-nav button").forEach(btn => {
+  btn.onclick = () => {
+    document.querySelectorAll(".desktop-nav button, .bottom-nav button").forEach(b => b.classList.remove("on"));
+    btn.classList.add("on");
+    const match = document.querySelector('.bottom-nav button[data-nav="' + btn.dataset.nav + '"]');
+    if (match) match.classList.add("on");
+    showSection(btn.dataset.nav);
+  };
+});
+
 </script>
 
 
@@ -4430,6 +4450,16 @@ document.querySelectorAll(".bottom-nav button").forEach(btn => {
 })();
 </script>
 
+
+
+<nav class="desktop-nav">
+  <button type="button" data-nav="inventory" class="on">Inventory</button>
+  <button type="button" data-nav="anime">Anime</button>
+  <button type="button" data-nav="add">Add</button>
+  <button type="button" data-nav="watch">Watchlist</button>
+  <button type="button" data-nav="stream">Stream</button>
+  <button type="button" data-nav="settings">Settings</button>
+</nav>
 
 <nav class="bottom-nav">
   <button type="button" data-nav="inventory" class="on">Inventory</button>
