@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.021</title>
+<title>Movie Desk 0.11.022</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.021</h1>
+  <h1>Movie Desk 0.11.022</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -165,10 +165,12 @@
     </div>
     <div class="add-wrap" style="margin-bottom:12px">
       <div class="add-row">
-        <input type="text" id="animeTitleInput" placeholder="Anime title..." autocomplete="off">
+        <div style="position:relative;flex:1">
+          <input type="text" id="animeTitleInput" placeholder="Anime title..." autocomplete="off" style="width:100%">
+          <div id="animeSuggest" class="suggest"></div>
+        </div>
         <button id="animeScanBtn">Scan</button>
         <button id="animeAddBtn">Add Anime</button>
-        <div id="animeSuggest" class="suggest"></div>
       </div>
     </div>
     <div class="tool-row" style="margin-bottom:6px">
@@ -659,10 +661,6 @@
     <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
       <input type="checkbox" id="editSs">
       <span>ss</span>
-    </label>
-    <label style="display:flex;align-items:center;gap:8px;margin:10px 0">
-      <input type="checkbox" id="editGuide">
-      <span>Parents Guide</span>
     </label>
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="editSave">Save</button>
@@ -1851,9 +1849,13 @@ async function omdbSuggest(query, box) {
       box.classList.add("show");
       box.querySelectorAll("div").forEach(el => {
         el.onclick = () => {
-          const field = box.id === "motherSuggest" ? $("motherTitle") : $("childTitle");
-          field.value = el.dataset.title;
-          field.dataset.imdbId = el.dataset.id;
+          let field = $("childTitle");
+          if (box.id === "motherSuggest") field = $("motherTitle");
+          else if (box.id === "animeSuggest") field = $("animeTitleInput");
+          if (field) {
+            field.value = el.dataset.title;
+            field.dataset.imdbId = el.dataset.id;
+          }
           box.classList.remove("show");
         };
       });
@@ -2110,7 +2112,7 @@ function setCover(id, url) {
 }
 
 function badgeFxMap() {
-  const base = { uhd: "shimmer", blu: "polish", dvd: "polish" };
+  const base = { uhd: "polish", blu: "polish", dvd: "polish" };
   try { return Object.assign(base, JSON.parse(localStorage.getItem("md_badge_fx") || "{}")); }
   catch (e) { return base; }
 }
@@ -2131,10 +2133,8 @@ function discBadge(bucket, fxMap) {
       + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0%" stop-color="#fff6d4"/><stop offset="50%" stop-color="#c9a227"/><stop offset="100%" stop-color="#6e4e10"/>'
       + '</linearGradient>'
-      + '<filter id="' + gid + 's"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.5"/></filter>'
       + '</defs>'
-      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#3a2706" stroke-width="1.5" filter="url(#' + gid + 's)"/>'
-      + '<rect x="6" y="6" width="108" height="20" rx="6" fill="rgba(255,255,255,0.25)"/>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#3a2706" stroke-width="1"/>'
       + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
       + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="28" font-weight="900" fill="url(#' + gid2 + ')">4K</text>'
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#3a2706" letter-spacing="1">ULTRA HD</text>'
@@ -2150,10 +2150,8 @@ function discBadge(bucket, fxMap) {
       + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0%" stop-color="#f7fbff"/><stop offset="50%" stop-color="#8ec4f2"/><stop offset="100%" stop-color="#1a6aaf"/>'
       + '</linearGradient>'
-      + '<filter id="' + gid + 's"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.5"/></filter>'
       + '</defs>'
-      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#082848" stroke-width="1.5" filter="url(#' + gid + 's)"/>'
-      + '<rect x="6" y="6" width="108" height="20" rx="6" fill="rgba(255,255,255,0.2)"/>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#082848" stroke-width="1"/>'
       + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
       + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="900" fill="url(#' + gid2 + ')">BLU</text>'
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#f4f9ff" letter-spacing="1">RAY</text>'
@@ -2169,10 +2167,8 @@ function discBadge(bucket, fxMap) {
       + '<linearGradient id="' + gid2 + '" x1="0" y1="0" x2="0" y2="1">'
       + '<stop offset="0%" stop-color="#ffffff"/><stop offset="50%" stop-color="#d8dee5"/><stop offset="100%" stop-color="#8e969e"/>'
       + '</linearGradient>'
-      + '<filter id="' + gid + 's"><feDropShadow dx="0" dy="2" stdDeviation="2" flood-opacity="0.5"/></filter>'
       + '</defs>'
-      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#2c3136" stroke-width="1.5" filter="url(#' + gid + 's)"/>'
-      + '<rect x="6" y="6" width="108" height="20" rx="6" fill="rgba(255,255,255,0.3)"/>'
+      + '<rect x="2" y="2" width="116" height="76" rx="12" fill="url(#' + gid + ')" stroke="#2c3136" stroke-width="1"/>'
       + '<rect x="8" y="8" width="104" height="48" rx="8" fill="#0a0a0a"/>'
       + '<text x="60" y="42" text-anchor="middle" font-family="system-ui,sans-serif" font-size="26" font-weight="900" fill="url(#' + gid2 + ')">DVD</text>'
       + '<text x="60" y="68" text-anchor="middle" font-family="system-ui,sans-serif" font-size="8" font-weight="700" fill="#2c3136" letter-spacing="1">VIDEO</text>'
@@ -2735,7 +2731,6 @@ function openEdit(id) {
   renderEditTags(m);
   const key = homoKey(m);
   $("editSs").checked = !!homoFlags[key];
-  if ($("editGuide")) $("editGuide").checked = !!guideFlags[key];
   $("editPanel").dataset.id = id;
   $("editPanel").classList.add("show");
   const thumb = $("editCoverThumb");
@@ -4233,78 +4228,6 @@ function animeEnsure(item){
     }).catch(()=>{});
   }
 }
-
-const anilistDB = { name: "md_anilist", store: "cache" };
-function openAnilistDB() {
-  return new Promise((resolve, reject) => {
-    const req = indexedDB.open(anilistDB.name, 1);
-    req.onupgradeneeded = () => req.result.createObjectStore(anilistDB.store);
-    req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
-  });
-}
-async function anilistGet(key) {
-  try {
-    const db = await openAnilistDB();
-    return await new Promise((res, rej) => {
-      const tx = db.transaction(anilistDB.store, "readonly");
-      const r = tx.objectStore(anilistDB.store).get(key);
-      r.onsuccess = () => res(r.result);
-      r.onerror = () => rej(r.error);
-    });
-  } catch(e) { return null; }
-}
-async function anilistSet(key, val) {
-  try {
-    const db = await openAnilistDB();
-    await new Promise((res, rej) => {
-      const tx = db.transaction(anilistDB.store, "readwrite");
-      tx.objectStore(anilistDB.store).put(val, key);
-      tx.oncomplete = () => res();
-      tx.onerror = () => rej(tx.error);
-    });
-  } catch(e) {}
-}
-async function anilistSearch(q) {
-  const key = "search:" + q.toLowerCase();
-  const cached = await anilistGet(key);
-  if (cached && Date.now() - cached.t < 86400000) return cached.data;
-  const query = `query ($search: String) { Page(page:1, perPage:8) { media(search:$search, type:ANIME) { id title { romaji english } coverImage { medium } } } }`;
-  try {
-    const res = await fetch("https://graphql.anilist.co", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ query, variables: { search: q } })
-    });
-    const data = await res.json();
-    const list = (data.data && data.data.Page && data.data.Page.media) || [];
-    await anilistSet(key, { t: Date.now(), data: list });
-    return list;
-  } catch(e) { return []; }
-}
-let anilistTimer = 0;
-async function animeSuggest(q) {
-  const box = $("animeSuggest");
-  if (!box || !q || q.length < 2) { if (box) box.innerHTML = ""; return; }
-  clearTimeout(anilistTimer);
-  anilistTimer = setTimeout(async () => {
-    const list = await anilistSearch(q);
-    if (!box) return;
-    box.innerHTML = list.map(m => {
-      const title = (m.title && (m.title.english || m.title.romaji)) || "";
-      const cover = (m.coverImage && m.coverImage.medium) || "";
-      return '<div data-anilist-id="' + m.id + '" data-title="' + title.replace(/"/g, '&quot;') + '" data-cover="' + cover + '" style="padding:8px;cursor:pointer;border-bottom:1px solid #333">' + title + '</div>'
-    }).join("");
-    box.querySelectorAll("[data-anilist-id]").forEach(el => {
-      el.onclick = () => {
-        const input = $("animeTitleInput");
-        if (input) input.value = el.dataset.title;
-        box.innerHTML = "";
-      };
-    });
-  }, 300);
-}
-
 function animeOpenAdd(){
   const input = $("animeTitleInput");
   const title = (input && input.value || "").trim();
@@ -4345,7 +4268,7 @@ function wireLiveFilters() {
 }
 wireLiveFilters();
 
-if ($("animeTitleInput")) $("animeTitleInput").oninput = () => animeSuggest($("animeTitleInput").value);
+if ($("animeTitleInput")) $("animeTitleInput").oninput = () => queueSuggest($("animeTitleInput").value, $("animeSuggest"));
 if ($("animeScanBtn")) $("animeScanBtn").onclick = () => startScan("anime");
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
 function animeOpenDetail(id){
