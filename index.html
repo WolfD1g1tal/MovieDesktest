@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.029</title>
+<title>Movie Desk 0.11.030</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.029</h1>
+  <h1>Movie Desk 0.11.030</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -666,6 +666,10 @@
     <div style="display:flex;gap:8px;margin-top:10px">
       <button id="editSave">Save</button>
       <button id="editCancel" style="background:#333">Cancel</button>
+    </div>
+    <div id="editFloat" style="position:sticky;bottom:0;background:#1a1a1a;padding:8px 0;display:flex;gap:8px;border-top:1px solid #333;margin-top:12px">
+      <button id="editFloatSave" style="flex:1;height:40px">Save</button>
+      <button id="editFloatClose" style="flex:1;height:40px;background:#333">Close</button>
     </div>
   </div>
 </div>
@@ -2114,6 +2118,9 @@ function setCover(id, url) {
   const m = getById(id);
   if (!m) return;
   m.coverUrl = url;
+  if ($("editCoverUrl")) $("editCoverUrl").value = url;
+  const thumb = $("editCoverThumb");
+  if (thumb) thumb.style.backgroundImage = url ? "url(" + JSON.stringify(url) + ")" : "none";
   if (collection.find(x => x.id === id)) saveColl();
   else saveManual();
   render();
@@ -2803,6 +2810,8 @@ $("editSave").onclick = () => {
   render();
 };
 $("editCancel").onclick = () => $("editPanel").classList.remove("show");
+if ($("editFloatSave")) $("editFloatSave").onclick = () => $("editSave").click();
+if ($("editFloatClose")) $("editFloatClose").onclick = () => $("editPanel").classList.remove("show");
 
 function ssOnCard() {
   return localStorage.getItem("md_ss_on_card") === "1";
