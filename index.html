@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.026</title>
+<title>Movie Desk 0.11.028</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.026</h1>
+  <h1>Movie Desk 0.11.028</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -2532,7 +2532,8 @@ function render() {
       return true;
     })();
     const watchNote = onWatch ? '<span class="flag" style="background:#2a2048;color:#c4b5fd">Watchlist</span>' : "";
-    return `<div class="card">
+    const offset = m.fromPackage ? ' style="margin-left:24px;border-left:2px solid #3a5a7a"' : '';
+    return `<div class="card"${offset}>
       ${cover}
       <div class="card-body">
         <div class="card-title" data-id="${m.id||""}" data-mother="${m.isMother ? m.id : ""}">${displayTitle(m.title)}${friendTag}</div>
@@ -2629,9 +2630,27 @@ function bindInventoryClicks() {
       if (!m) return;
       m.ownedSeasons = m.ownedSeasons || [];
       const idx = m.ownedSeasons.indexOf(s);
-      if (idx >= 0) m.ownedSeasons.splice(idx, 1);
-      else m.ownedSeasons.push(s);
+      if (idx >= 0) {
+        m.ownedSeasons.splice(idx, 1);
+        const seasonTitle = m.title + " - Season " + s;
+        const child = getAll().find(x => x.motherId === mid && x.title === seasonTitle);
+        if (child) {
+          manualTitles = manualTitles.filter(x => x.id !== child.id);
+          collection = collection.filter(x => x.id !== child.id);
+          m.children = (m.children || []).filter(cid => cid !== child.id);
+        }
+      } else {
+        m.ownedSeasons.push(s);
+        const seasonTitle = m.title + " - Season " + s;
+        if (!getAll().some(x => x.motherId === mid && x.title === seasonTitle)) {
+          const c = makeChild(seasonTitle, mid, { genres: m.genres || "", discType: m.discType || "", imdbId: m.imdbId || "" });
+          manualTitles.push(c);
+          m.children = m.children || [];
+          m.children.push(c.id);
+        }
+      }
       saveManual();
+      saveColl();
       render();
       return;
     }
@@ -4150,7 +4169,8 @@ function animeRender(){
     const badge = discBadge(discBucket({discType:item.format||"", title:item.title}), {});
     const genres = genreTagHtml(item.genres || "");
     const imdb = item.imdbId ? `<span class="flag imdb">IMDb: ${item.publicRating||"-"}</span>` : `<span class="flag imdb">IMDb: -</span>`;
-    return `<div class="card">
+    const offset = item.fromPackage ? ' style="margin-left:24px;border-left:2px solid #3a5a7a"' : '';
+    return `<div class="card"${offset}>
       ${cover}
       <div class="card-body">
         <div class="card-title" data-anime-id="${item.id}">${escWatch(displayTitle(item.title))}</div>
@@ -4454,9 +4474,34 @@ document.addEventListener("click", (e) => {
     const item = animeInv.find(x => String(x.id) === String(id));
     if (!item) return;
     item.ownedSeasons = item.ownedSeasons || [];
+    item.children = item.children || [];
+    const seasonTitle = item.title + " - Season " + s;
     const idx = item.ownedSeasons.indexOf(s);
-    if (idx >= 0) item.ownedSeasons.splice(idx, 1);
-    else item.ownedSeasons.push(s);
+    if (idx >= 0) {
+      item.ownedSeasons.splice(idx, 1);
+      const child = animeInv.find(x => x.motherId === item.id && x.title === seasonTitle);
+      if (child) {
+        animeInv = animeInv.filter(x => x.id !== child.id);
+        item.children = item.children.filter(cid => cid !== child.id);
+      }
+    } else {
+      item.ownedSeasons.push(s);
+      if (!animeInv.some(x => x.motherId === item.id && x.title === seasonTitle)) {
+        const c = {
+          id: Date.now() + Math.random(),
+          title: seasonTitle,
+          year: item.year || "",
+          format: item.format || "Blu-ray",
+          imdbId: item.imdbId || "",
+          cover: item.cover || "",
+          genres: item.genres || "",
+          motherId: item.id,
+          fromPackage: item.id
+        };
+        animeInv.push(c);
+        item.children.push(c.id);
+      }
+    }
     animeSave();
     animeRender();
     return;
