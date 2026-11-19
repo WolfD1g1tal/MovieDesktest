@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.032</title>
+<title>Movie Desk 0.11.033</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -131,13 +131,14 @@
   .card:hover { border-color: #444; }
   .card-title:hover { color: #8ab4f8; }
 
-  .field-clear { position: absolute; right: 6px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #888; font-size: 1rem; cursor: pointer; padding: 4px; }
-  .field-wrap { position: relative; }
+  .field-clear { position: absolute; right: 4px; top: 50%; transform: translateY(-50%); background: none; border: none; color: #ccc; font-size: 1.1rem; font-weight: 700; cursor: pointer; padding: 2px 6px; line-height: 1; }
+  .field-wrap { position: relative; display: inline-block; width: 100%; }
+  .field-wrap input, .field-wrap textarea { padding-right: 28px !important; width: 100%; box-sizing: border-box; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.032</h1>
+  <h1>Movie Desk 0.11.033</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -4646,6 +4647,26 @@ document.querySelectorAll(".field-clear").forEach(btn => {
     if (el) el.value = "";
   };
 });
+
+
+function addClearButtons() {
+  document.querySelectorAll("input[type=text], input[type=search], input[type=number], textarea").forEach(el => {
+    if (el.dataset.hasClear) return;
+    if (el.type === "file" || el.type === "checkbox" || el.type === "color") return;
+    const wrap = document.createElement("div");
+    wrap.className = "field-wrap";
+    el.parentNode.insertBefore(wrap, el);
+    wrap.appendChild(el);
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "field-clear";
+    btn.textContent = "×";
+    btn.onclick = () => { el.value = ""; el.dispatchEvent(new Event("input")); };
+    wrap.appendChild(btn);
+    el.dataset.hasClear = "1";
+  });
+}
+setTimeout(addClearButtons, 100);
 
 </script>
 
