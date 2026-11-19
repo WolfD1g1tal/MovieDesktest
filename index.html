@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk Android-beta-0.12.001</title>
+<title>Movie Desk 0.11.029</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -130,58 +130,11 @@
 
   .card:hover { border-color: #444; }
   .card-title:hover { color: #8ab4f8; }
-
-  .ios-row { display: flex; gap: 10px; align-items: center; background: #1a1a1a; border: 1px solid #2a2a2a; border-radius: 10px; padding: 8px; margin-bottom: 6px; cursor: pointer; }
-  .ios-row img, .ios-row .ios-cover { width: 48px; height: 72px; object-fit: cover; border-radius: 4px; background: #222; flex-shrink: 0; }
-  .ios-row .ios-body { flex: 1; min-width: 0; }
-  .ios-row .ios-title { font-weight: 500; font-size: 0.95rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .ios-row .ios-meta { color: #888; font-size: 0.75rem; }
-  .ios-chev { color: #555; font-size: 1.1rem; }
-  #iosDetail { display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 200; }
-  #iosDetail.show { display: flex; align-items: flex-end; }
-  #iosDetail .sheet { background: #1a1a1a; border-radius: 16px 16px 0 0; width: 100%; max-height: 85vh; overflow: auto; padding: 16px; }
-  #iosDetail .sheet-handle { width: 36px; height: 4px; background: #444; border-radius: 2px; margin: 0 auto 12px; }
-
-  .ios-chip { height: 28px; padding: 0 12px; border-radius: 14px; background: #222; border: 1px solid #333; color: #aaa; font-size: 0.75rem; white-space: nowrap; }
-  .ios-chip.on { background: #3a3a3a; color: #fff; border-color: #555; }
-
-  body.theme-frieren { background: #0e1418; color: #d8e4ea; }
-  body.theme-frieren .ios-row { background: #1a242c; border-color: #2a3a44; }
-  body.theme-frieren .ios-chip { background: #1e2a32; border-color: #3a4a54; color: #a8c0cc; }
-  body.theme-frieren .ios-chip.on { background: #2a3a44; color: #e8f0f4; border-color: #5a7a8a; }
-  body.theme-frieren #iosDetail .sheet { background: #141c22; }
-  body.theme-frieren .card { background: #1a242c; border-color: #2a3a44; }
-  body.theme-frieren::before {
-    content: "";
-    position: fixed;
-    top: 40px; right: 20px;
-    width: 80px; height: 80px;
-    background: radial-gradient(circle, rgba(120,180,200,.15), transparent 70%);
-    pointer-events: none;
-    z-index: 1;
-  }
-  body.theme-frieren::after {
-    content: "";
-    position: fixed;
-    bottom: 80px; left: 16px;
-    width: 60px; height: 60px;
-    background: radial-gradient(circle, rgba(180,200,220,.1), transparent 70%);
-    pointer-events: none;
-    z-index: 1;
-  }
-  body.theme-frieren .section::before {
-    content: "";
-    position: absolute;
-    top: 10px; left: 10px;
-    width: 40px; height: 40px;
-    background: radial-gradient(circle, rgba(140,180,200,.08), transparent 60%);
-    pointer-events: none;
-  }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk Android-beta-0.12.001</h1>
+  <h1>Movie Desk 0.11.029</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -251,24 +204,11 @@
     <div id="animeGrid" class="grid"></div>
   </div>
   <div id="secInventory" class="section active">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
-      <div>
-        <div style="font-weight:600;font-size:1.1rem">Inventory</div>
-        <div style="font-size:0.75rem;color:#888">Your media collection</div>
-      </div>
-      <button type="button" id="iosSearchBtn" style="height:32px;padding:0 12px;border-radius:16px;background:#222;border:1px solid #333;color:#aaa">Search</button>
-    </div>
-    <div id="iosChips" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:4px">
-      <button type="button" class="ios-chip on" data-ios-filter="">All</button>
-      <button type="button" class="ios-chip" data-ios-filter="movie">Movies</button>
-      <button type="button" class="ios-chip" data-ios-filter="series">TV Shows</button>
-      <button type="button" class="ios-chip" data-ios-filter="anime">Anime</button>
-    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
       <button id="shelfBtn" type="button" style="height:32px;padding:0 10px;font-size:0.78rem">Shelves</button>
       <span id="shelfStatus" style="font-size:0.75rem;color:#888"></span>
     </div>
-    <input type="search" id="q" placeholder="Search your titles..." style="display:none">
+    <input type="search" id="q" placeholder="Search your titles...">
     <div class="tool-row">
       <button type="button" id="filterBtn">Filter</button>
       <select id="sortSel" aria-label="Sort">
@@ -2459,35 +2399,6 @@ function saveUiState() {
 function loadUiState() {
   // only restore once on init; do not override user changes
 }
-
-
-function renderIosList(items) {
-  const out = $("out");
-  if (!out) return;
-  out.style.display = "block";
-  out.innerHTML = items.map(m => {
-    const cover = m.coverUrl ? '<img src="' + m.coverUrl + '" alt="">' : '<div class="ios-cover" style="display:flex;align-items:center;justify-content:center;color:#555;font-size:0.6rem">cover</div>';
-    const meta = [m.year, m.genres ? m.genres.split(",")[0] : ""].filter(Boolean).join(" · ");
-    return '<div class="ios-row" data-ios-id="' + m.id + '">' + cover + '<div class="ios-body"><div class="ios-title">' + escWatch(displayTitle(m.title)) + '</div><div class="ios-meta">' + meta + '</div></div><span class="ios-chev">›</span></div>';
-  }).join("") || '<div style="text-align:center;color:#777;padding:40px">No titles</div>';
-  out.querySelectorAll(".ios-row").forEach(row => {
-    row.onclick = () => openIosDetail(row.dataset.iosId);
-  });
-}
-function openIosDetail(id) {
-  const m = getById(id);
-  if (!m) return;
-  const box = $("iosDetail");
-  const content = $("iosDetailContent");
-  const cover = m.coverUrl ? '<img src="' + m.coverUrl + '" style="width:100px;height:150px;object-fit:cover;border-radius:6px">' : '<div style="width:100px;height:150px;background:#222;border-radius:6px"></div>';
-  const genres = (m.genres || "").split(",").filter(Boolean).map(g => '<span class="flag">' + g.trim() + '</span>').join(" ");
-  const flags = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"><span class="flag own">In Collection</span><span class="flag">' + (m.discType || m.format || "DVD") + '</span>' + (m.tags||[]).map(t => '<span class="flag" style="background:' + (t.color||"#333") + '">' + (t.symbol||"") + " " + escWatch(t.name||"") + '</span>').join("") + '</div>';
-  content.innerHTML = '<div style="display:flex;gap:12px"><div>' + cover + '</div><div style="flex:1"><div style="font-weight:600;font-size:1.1rem">' + escWatch(displayTitle(m.title)) + '</div><div style="color:#888;font-size:0.8rem;margin:4px 0">' + (m.year||"") + '</div><div style="margin:6px 0">' + genres + '</div><div style="font-size:0.85rem;color:#ccc;margin:8px 0">' + escWatch(m.summary || m.notes || "") + '</div>' + flags + '</div></div><div style="display:flex;gap:8px;margin-top:12px"><button id="iosEdit" style="flex:1;height:40px">Edit</button><button id="iosDel" style="flex:1;height:40px;background:#3a1a1a;color:#f88">Delete</button></div>';
-  box.classList.add("show");
-  $("iosEdit").onclick = () => { box.classList.remove("show"); openEdit(id); };
-  $("iosDel").onclick = () => { box.classList.remove("show"); confirmDelete(id); };
-}
-$("iosDetail").onclick = (e) => { if (e.target === $("iosDetail")) $("iosDetail").classList.remove("show"); };
 
 function render() {
   try {
@@ -4716,19 +4627,6 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "/") { const q = document.getElementById("q"); if (q) { q.focus(); e.preventDefault(); } }
 });
 
-
-if ($("iosSearchBtn")) $("iosSearchBtn").onclick = () => {
-  const q = $("q");
-  if (q) { q.style.display = q.style.display === "none" ? "block" : "none"; if (q.style.display !== "none") q.focus(); }
-};
-document.querySelectorAll(".ios-chip").forEach(chip => {
-  chip.onclick = () => {
-    document.querySelectorAll(".ios-chip").forEach(c => c.classList.remove("on"));
-    chip.classList.add("on");
-    render();
-  };
-});
-
 </script>
 
 
@@ -4782,14 +4680,6 @@ document.querySelectorAll(".ios-chip").forEach(chip => {
   <button type="button" data-nav="stream">Stream</button>
   <button type="button" data-nav="settings">Settings</button>
 </nav>
-
-
-<div id="iosDetail">
-  <div class="sheet">
-    <div class="sheet-handle"></div>
-    <div id="iosDetailContent"></div>
-  </div>
-</div>
 
 </body>
 </html>
