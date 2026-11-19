@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.024</title>
+<title>Movie Desk 0.11.025</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.024</h1>
+  <h1>Movie Desk 0.11.025</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -157,6 +157,7 @@
         <option value="frieren">Frieren</option>
       </select>
       <input type="search" id="animeSearch" placeholder="Search anime..." oninput="animeRender()" style="flex:1;min-width:160px">
+<button type="button" id="animeAnilistBtn" style="height:32px;padding:0 8px;font-size:0.75rem">AniList</button>
       <select id="animeSort" onchange="animeRender()">
         <option value="title">Title A-Z</option>
         <option value="year">Year</option>
@@ -710,6 +711,8 @@ let homoFlags = JSON.parse(localStorage.getItem("md_homo") || "{}");
 let guideFlags = JSON.parse(localStorage.getItem("md_guide") || "{}");
 let boutiqueFlags = JSON.parse(localStorage.getItem("md_boutique") || "{}");
 const BOUTIQUE_LABELS = ["Arrow","Manta Labs","Kino Lorber","Criterion","Vinegar Syndrome","Severin","Scream Factory","Shout Factory","88 Films","Eureka","Indicator"];
+let boutiqueStrip = JSON.parse(localStorage.getItem("md_boutique_strip") || "false");
+function saveBoutiqueStrip(){ localStorage.setItem("md_boutique_strip", JSON.stringify(boutiqueStrip)); }
 function stripBoutique(label) {
   if (!label) return;
   const l = label.toLowerCase();
@@ -4175,6 +4178,30 @@ function animeRender(){
     </div>`;
   }).join("");
 }
+
+const animeCache = JSON.parse(localStorage.getItem("md_anime_cache") || "{}");
+function saveAnimeCache(){ localStorage.setItem("md_anime_cache", JSON.stringify(animeCache)); }
+async function anilistSearch(query) {
+  const key = (query || "").toLowerCase().trim();
+  if (!key || key.length < 2) return [];
+  if (animeCache[key]) return animeCache[key];
+  try {
+    const res = await fetch("https://graphql.anilist.co", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        query: "query($s:String){ Page(perPage:8){ media(search:$s, type:ANIME){ id title{romaji english} coverImage{large} episodes } } }",
+        variables: { s: query }
+      })
+    });
+    const d = await res.json();
+    const list = (d && d.data && d.data.Page && d.data.Page.media) || [];
+    animeCache[key] = list;
+    saveAnimeCache();
+    return list;
+  } catch(e) { return []; }
+}
+
 function animeEnsure(item){
   if (!item || !item.title) return;
   const seasonInfo = parseSeasonTitle(item.title);
@@ -4273,6 +4300,21 @@ function wireLiveFilters() {
 }
 wireLiveFilters();
 
+if ($("animeAnilistBtn")) $("animeAnilistBtn").onclick = async () => {
+  const q = ($("animeSearch") && $("animeSearch").value) || ($("animeTitleInput") && $("animeTitleInput").value) || "";
+  if (!q) { showPopup("Type a title first"); return; }
+  const hits = await anilistSearch(q);
+  if (!hits.length) { showPopup("No AniList results"); return; }
+  const box = $("animeSuggest") || document.createElement("div");
+  box.innerHTML = hits.map(m => '<div data-title="' + (m.title.english || m.title.romaji) + '" data-id="' + m.id + '">' + (m.title.english || m.title.romaji) + '</div>').join("");
+  box.classList.add("show");
+  box.querySelectorAll("div").forEach(el => {
+    el.onclick = () => {
+      if ($("animeTitleInput")) $("animeTitleInput").value = el.dataset.title;
+      box.classList.remove("show");
+    };
+  });
+};
 if ($("animeTitleInput")) $("animeTitleInput").oninput = () => queueSuggest($("animeTitleInput").value, $("animeSuggest"));
 if ($("animeScanBtn")) $("animeScanBtn").onclick = () => startScan("anime");
 if ($("animeAddBtn")) $("animeAddBtn").onclick = animeOpenAdd;
