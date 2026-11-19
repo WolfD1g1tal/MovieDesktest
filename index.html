@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.030</title>
+<title>Movie Desk 0.11.031</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.030</h1>
+  <h1>Movie Desk 0.11.031</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -613,7 +613,8 @@
 </main>
 
 <div class="modal" id="editPanel">
-  <div class="modal-box" style="text-align:left;max-height:80vh;overflow:auto">
+  <div class="modal-box" style="text-align:left;max-height:80vh;overflow:hidden;display:flex;flex-direction:column;padding-bottom:12px">
+    <div id="editScroll" style="flex:1 1 auto;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch">
     <p id="editTitle" style="font-weight:600;margin:0 0 8px"></p>
     <div style="display:flex;gap:10px;align-items:center;margin-bottom:10px">
       <div id="editCoverThumb" style="width:60px;height:90px;background:#222 center/cover no-repeat;border-radius:4px"></div>
@@ -667,7 +668,8 @@
       <button id="editSave">Save</button>
       <button id="editCancel" style="background:#333">Cancel</button>
     </div>
-    <div id="editFloat" style="position:sticky;bottom:0;background:#1a1a1a;padding:8px 0;display:flex;gap:8px;border-top:1px solid #333;margin-top:12px">
+    </div>
+    <div id="editFloat" style="flex:0 0 auto;background:#1a1a1a;padding:8px 0 0;display:flex !important;gap:8px;border-top:1px solid #333;margin-top:8px">
       <button id="editFloatSave" style="flex:1;height:40px">Save</button>
       <button id="editFloatClose" style="flex:1;height:40px;background:#333">Close</button>
     </div>
@@ -2766,7 +2768,7 @@ function openEdit(id) {
   const key = homoKey(m);
   $("editSs").checked = !!homoFlags[key];
   $("editPanel").dataset.id = id;
-  $("editPanel").classList.add("show");
+  $("editPanel").classList.add("show"); if ($("editScroll")) $("editScroll").scrollTop = 0;
   const thumb = $("editCoverThumb");
   if (thumb) thumb.style.backgroundImage = m.coverUrl ? "url(" + JSON.stringify(m.coverUrl) + ")" : "none";
 }
