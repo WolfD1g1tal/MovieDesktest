@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.11.025</title>
+<title>Movie Desk 0.11.026</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -134,7 +134,7 @@
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.11.025</h1>
+  <h1>Movie Desk 0.11.026</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -4202,6 +4202,23 @@ async function anilistSearch(query) {
   } catch(e) { return []; }
 }
 
+async function animeFetchSeasons(title, imdbId) {
+  if (imdbId) {
+    try {
+      const res = await fetch("https://www.omdbapi.com/?i=" + encodeURIComponent(imdbId) + "&apikey=" + OMDB_KEY);
+      const d = await res.json();
+      if (d && d.totalSeasons) return parseInt(d.totalSeasons, 10) || 0;
+      if (d && d.Type === "series") return 1;
+    } catch(e) {}
+  }
+  try {
+    const res = await fetch("https://www.omdbapi.com/?t=" + encodeURIComponent(title) + "&type=series&apikey=" + OMDB_KEY);
+    const d = await res.json();
+    if (d && d.totalSeasons) return parseInt(d.totalSeasons, 10) || 0;
+    if (d && d.Type === "series") return 1;
+  } catch(e) {}
+  return 0;
+}
 function animeEnsure(item){
   if (!item || !item.title) return;
   const seasonInfo = parseSeasonTitle(item.title);
@@ -4233,6 +4250,17 @@ function animeEnsure(item){
   }
   const key = (item.imdbId || item.title || "").toLowerCase().trim();
   if (animeInv.some(x => (x.imdbId || x.title || "").toLowerCase().trim() === key)) return;
+  animeFetchSeasons(item.title, item.imdbId).then(n => {
+    if (n > 1) {
+      const found = animeInv.find(x => norm(x.title) === norm(item.title));
+      if (found && !found.totalSeasons) {
+        found.totalSeasons = n;
+        found.ownedSeasons = found.ownedSeasons || [];
+        animeSave();
+        animeRender();
+      }
+    }
+  });
   const entry = {
     id: Date.now() + Math.random(),
     title: item.title,
