@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Movie Desk 0.12.001</title>
+<title>Movie Desk 0.12.002</title>
 <style>
   body { margin: 0; font-family: system-ui, sans-serif; background: #0e0e0e; color: #eee; }
   header { padding: 16px; border-bottom: 1px solid #222; position: sticky; top: 0; background: #0e0e0e; z-index: 10; }
@@ -141,11 +141,14 @@
   #iosDetail.show { display: flex; align-items: flex-end; }
   #iosDetail .sheet { background: #1a1a1a; border-radius: 16px 16px 0 0; width: 100%; max-height: 85vh; overflow: auto; padding: 16px; }
   #iosDetail .sheet-handle { width: 36px; height: 4px; background: #444; border-radius: 2px; margin: 0 auto 12px; }
+
+  .ios-chip { height: 28px; padding: 0 12px; border-radius: 14px; background: #222; border: 1px solid #333; color: #aaa; font-size: 0.75rem; white-space: nowrap; }
+  .ios-chip.on { background: #3a3a3a; color: #fff; border-color: #555; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Movie Desk 0.12.001</h1>
+  <h1>Movie Desk 0.12.002</h1>
   <div class="sub" id="counts">Ready</div>
 </header>
 <main>
@@ -215,11 +218,24 @@
     <div id="animeGrid" class="grid"></div>
   </div>
   <div id="secInventory" class="section active">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <div>
+        <div style="font-weight:600;font-size:1.1rem">Inventory</div>
+        <div style="font-size:0.75rem;color:#888">Your media collection</div>
+      </div>
+      <button type="button" id="iosSearchBtn" style="height:32px;padding:0 12px;border-radius:16px;background:#222;border:1px solid #333;color:#aaa">Search</button>
+    </div>
+    <div id="iosChips" style="display:flex;gap:6px;overflow-x:auto;margin-bottom:8px;padding-bottom:4px">
+      <button type="button" class="ios-chip on" data-ios-filter="">All</button>
+      <button type="button" class="ios-chip" data-ios-filter="movie">Movies</button>
+      <button type="button" class="ios-chip" data-ios-filter="series">TV Shows</button>
+      <button type="button" class="ios-chip" data-ios-filter="anime">Anime</button>
+    </div>
     <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:6px;align-items:center">
       <button id="shelfBtn" type="button" style="height:32px;padding:0 10px;font-size:0.78rem">Shelves</button>
       <span id="shelfStatus" style="font-size:0.75rem;color:#888"></span>
     </div>
-    <input type="search" id="q" placeholder="Search your titles...">
+    <input type="search" id="q" placeholder="Search your titles..." style="display:none">
     <div class="tool-row">
       <button type="button" id="filterBtn">Filter</button>
       <select id="sortSel" aria-label="Sort">
@@ -2432,7 +2448,8 @@ function openIosDetail(id) {
   const content = $("iosDetailContent");
   const cover = m.coverUrl ? '<img src="' + m.coverUrl + '" style="width:100px;height:150px;object-fit:cover;border-radius:6px">' : '<div style="width:100px;height:150px;background:#222;border-radius:6px"></div>';
   const genres = (m.genres || "").split(",").filter(Boolean).map(g => '<span class="flag">' + g.trim() + '</span>').join(" ");
-  content.innerHTML = '<div style="display:flex;gap:12px"><div>' + cover + '</div><div style="flex:1"><div style="font-weight:600;font-size:1.1rem">' + escWatch(displayTitle(m.title)) + '</div><div style="color:#888;font-size:0.8rem;margin:4px 0">' + (m.year||"") + '</div><div style="margin:6px 0">' + genres + '</div><div style="font-size:0.85rem;color:#ccc;margin:8px 0">' + escWatch(m.summary || m.notes || "") + '</div></div></div><div style="display:flex;gap:8px;margin-top:12px"><button id="iosEdit" style="flex:1;height:40px">Edit</button><button id="iosDel" style="flex:1;height:40px;background:#3a1a1a;color:#f88">Delete</button></div>';
+  const flags = '<div style="display:flex;gap:6px;flex-wrap:wrap;margin:8px 0"><span class="flag own">In Collection</span><span class="flag">' + (m.discType || m.format || "DVD") + '</span>' + (m.tags||[]).map(t => '<span class="flag" style="background:' + (t.color||"#333") + '">' + (t.symbol||"") + " " + escWatch(t.name||"") + '</span>').join("") + '</div>';
+  content.innerHTML = '<div style="display:flex;gap:12px"><div>' + cover + '</div><div style="flex:1"><div style="font-weight:600;font-size:1.1rem">' + escWatch(displayTitle(m.title)) + '</div><div style="color:#888;font-size:0.8rem;margin:4px 0">' + (m.year||"") + '</div><div style="margin:6px 0">' + genres + '</div><div style="font-size:0.85rem;color:#ccc;margin:8px 0">' + escWatch(m.summary || m.notes || "") + '</div>' + flags + '</div></div><div style="display:flex;gap:8px;margin-top:12px"><button id="iosEdit" style="flex:1;height:40px">Edit</button><button id="iosDel" style="flex:1;height:40px;background:#3a1a1a;color:#f88">Delete</button></div>';
   box.classList.add("show");
   $("iosEdit").onclick = () => { box.classList.remove("show"); openEdit(id); };
   $("iosDel").onclick = () => { box.classList.remove("show"); confirmDelete(id); };
@@ -4666,6 +4683,19 @@ document.addEventListener("keydown", (e) => {
   const map = { "1": "inventory", "2": "anime", "3": "add", "4": "watch", "5": "stream", "6": "settings" };
   if (map[e.key]) { showSection(map[e.key]); e.preventDefault(); }
   if (e.key === "/") { const q = document.getElementById("q"); if (q) { q.focus(); e.preventDefault(); } }
+});
+
+
+if ($("iosSearchBtn")) $("iosSearchBtn").onclick = () => {
+  const q = $("q");
+  if (q) { q.style.display = q.style.display === "none" ? "block" : "none"; if (q.style.display !== "none") q.focus(); }
+};
+document.querySelectorAll(".ios-chip").forEach(chip => {
+  chip.onclick = () => {
+    document.querySelectorAll(".ios-chip").forEach(c => c.classList.remove("on"));
+    chip.classList.add("on");
+    render();
+  };
 });
 
 </script>
